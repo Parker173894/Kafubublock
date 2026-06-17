@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="page">
+  <h2>Upload Guidance and Counselling Post / Video</h2>
+  <form method="post" enctype="multipart/form-data" class="form-card wide">
+    <label>Title</label>
+    <input name="title" required placeholder="Example: How to Prepare for Exams">
+
+    <label>Category</label>
+    <select name="category">
+      <option>Learner Support</option>
+      <option>Study Skills</option>
+      <option>Career Guidance</option>
+      <option>Discipline and Behaviour</option>
+      <option>Health and Wellness</option>
+      <option>Motivation</option>
+      <option>Anti-Bullying</option>
+    </select>
+
+    <label>Message / Teaching Notes</label>
+    <textarea name="message" required placeholder="Write the counselling or educational message for learners..."></textarea>
+
+    <label>Upload Video</label>
+    <input type="file" name="video" accept="video/mp4,video/webm,video/ogg,video/quicktime">
+    <small>Allowed video formats: MP4, WEBM, OGG and MOV. Maximum video size: 750MB.</small>
+
+    <button class="btn" type="submit">Post to Learners</button>
+  </form>
+</section>
+{% endblock %}

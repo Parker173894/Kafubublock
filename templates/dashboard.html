@@ -1,0 +1,161 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="page">
+  <h2>{% if session.role == 'student' %}Pupil Portal{% else %}School Staff Portal{% endif %}</h2>
+  <p>Welcome, {{ session.full_name }}.</p>
+
+  {% if session.role == 'student' and not student_results_active %}
+    <div class="notice warning"><b>Results portal closed:</b> Pupil results are currently deactivated by school management. You will be able to view and download results when the portal is activated.</div>
+  {% endif %}
+
+  {% if session.role in FULL_ACCESS_ROLES or session.role == 'deputy_headteacher' %}
+    <div class="notice success"><b>Full Access:</b> This account can access leadership, HR, departmental materials, pupil register, results, official documents and donor needs.</div>
+  {% elif session.role == 'deputy_headteacher' %}
+    <div class="notice"><b>Deputy Headteacher Portal:</b> You can access school documents, learner records, results, supervision resources, and manage HOD and Subject Teacher profiles.</div>
+  {% elif session.role == 'guidance_counselling' %}
+    <div class="notice"><b>Guidance and Counselling Portal:</b> You can upload counselling messages and educational videos for learners.</div>
+  {% elif session.role.startswith('hod_') %}
+    <div class="notice"><b>HOD Portal:</b> You can upload materials for your department, manage learner results, and manage Subject Teacher profiles under your department.</div>
+  {% endif %}
+
+  <div class="cards three">
+    <div class="card stat"><h3>{{ material_count }}</h3><p>Department Materials</p></div>
+    <div class="card stat"><h3>{{ doc_count }}</h3><p>Official Documents</p></div>
+    <div class="card stat"><h3>{{ need_count }}</h3><p>Donor Needs</p></div>
+    {% if session.role != 'student' %}
+      <div class="card stat"><h3>{{ student_count }}</h3><p>Registered Pupils</p></div>
+      <div class="card stat"><h3>{{ result_count }}</h3><p>Uploaded Results</p></div>
+      <div class="card stat"><h3>{{ download_count }}</h3><p>Result Downloads</p></div>
+      <div class="card stat"><h3>{{ donation_count }}</h3><p>Donation Pledges</p></div>
+      <div class="card stat"><h3>{{ staff_return_count }}</h3><p>Staff Return Records</p></div>
+    {% endif %}
+  </div>
+
+  <h3>Portal Actions</h3>
+  <div class="portal-actions">
+    {% if session.role == 'student' %}
+      <a class="btn" href="{{ url_for('my_registration') }}">Pupil Registration</a>
+    {% else %}
+      {% if session.role in ['teacher','guidance_counselling'] %}<a class="btn" href="{{ url_for('profile') }}">Edit My Profile</a>{% else %}<a class="btn" href="{{ url_for('profile') }}">My Profile / Change Portal Password</a>{% endif %}
+      <a class="btn" href="{{ url_for('staff_return') }}">Staff Return Registration</a>
+      {% if session.role.startswith('hod_') %}<a class="btn" href="{{ url_for('teacher_register') }}">Register New Subject Teacher</a>{% endif %}
+    {% endif %}
+    <a class="btn" href="{{ url_for('guidance_posts') }}">Guidance and Counselling Posts / Videos</a>
+    <a class="btn" href="{{ url_for('school_calendar') }}">View School Calendar</a>
+
+    {% if session.role == 'student' %}
+      {% if student_results_active %}
+        <a class="btn" href="{{ url_for('student_results') }}">View My Results</a>
+        <a class="btn" href="{{ url_for('download_my_result_pdf') }}">Download Results PDF</a>
+        <a class="btn" href="{{ url_for('result_analysis') }}">My Result Analysis</a>
+      {% else %}
+        <span class="btn disabled">Results Portal Deactivated</span>
+      {% endif %}
+    {% else %}
+      <a class="btn" href="{{ url_for('materials') }}">Download Department Materials</a>
+      <a class="btn" href="{{ url_for('official_documents') }}">Official Documents</a>
+      <a class="btn" href="{{ url_for('students') }}">Pupil Register</a>
+      {% if session.role in ['headteacher','deputy_headteacher','hr'] %}<a class="btn" href="{{ url_for('student_records') }}">Pupil Registered Records / Total Pupils</a>{% endif %}
+      <a class="btn" href="{{ url_for('results') }}">Add / Manage Pupil Results</a>
+      <a class="btn" href="{{ url_for('student_results') }}">View Pupil Results</a>
+      <a class="btn" href="{{ url_for('result_analysis') }}">Pupil Result Analysis</a>
+      <a class="btn" href="{{ url_for('result_download_logs') }}">Result Download Records</a>
+
+      {% if session.role in ['guidance_counselling','headteacher','deputy_headteacher','hr'] %}
+        <a class="btn" href="{{ url_for('upload_guidance_post') }}">Upload Guidance Video / Post</a>
+      {% endif %}
+
+      {% if session.role.startswith('hod_') or session.role in ['headteacher','deputy_headteacher','hr'] %}
+        <a class="btn" href="{{ url_for('upload_material') }}">Upload Department Material</a>
+      {% endif %}
+
+      {% if session.role.startswith('hod_') or session.role in ['headteacher','deputy_headteacher','hr'] %}
+        <a class="btn" href="{{ url_for('manage_subject_teachers') }}">Manage HOD / Subject Teacher Profiles</a>
+      {% endif %}
+
+      {% if session.role in BACKGROUND_MANAGEMENT_ROLES %}
+        <a class="btn" href="{{ url_for('manage_backgrounds') }}">Upload / Manage Website Background Pictures</a>
+      {% endif %}
+
+      {% if session.role in CALENDAR_MANAGEMENT_ROLES %}
+        <a class="btn" href="{{ url_for('manage_school_calendar') }}">Add / Manage School Calendar</a>
+      {% endif %}
+
+      {% if session.role in ['headteacher','deputy_headteacher','hr'] %}
+        <a class="btn" href="{{ url_for('student_portal_control') }}">Activate / Deactivate Pupil Results Portal</a>
+        <a class="btn" href="{{ url_for('upload_document') }}">Upload Official / HR Document</a>
+        <a class="btn" href="{{ url_for('manage_donor_needs') }}">Manage Donor Needs</a>
+        <a class="btn" href="{{ url_for('donation_records') }}">Donation Pledge Records</a>
+        <a class="btn" href="{{ url_for('staff_return_records') }}">Staff Return Records</a>
+        {% if session.role in ['headteacher','hr'] %}<a class="btn" href="{{ url_for('manage_passwords') }}">Manage / Reset Portal Passwords</a><a class="btn" href="{{ url_for('password_reset_email_outbox') }}">Password Reset Email Outbox</a>{% endif %}
+        {% if session.role == 'hr' %}<a class="btn" href="{{ url_for('manage_staff_return_details') }}">Set Staff Return Details Required from Teachers</a>{% endif %}
+      {% endif %}
+      {% if session.role == 'headteacher' %}
+        <a class="btn" href="{{ url_for('edit_school_about') }}">Edit About: Vision, Mission, Core Values and Motto</a>
+        <a class="btn" href="{{ url_for('edit_contact_location') }}">Edit Contact and Location</a>
+      {% endif %}
+    {% endif %}
+  </div>
+
+  {% if session.role in FULL_ACCESS_ROLES %}
+    <h3>Full Access Panel</h3>
+    <div class="portal-actions admin-actions">
+      <a class="btn secondary" href="{{ url_for('leadership') }}">View Leadership, HR and HOD Profiles</a>
+      <a class="btn secondary" href="{{ url_for('departments') }}">View All Departments</a>
+      <a class="btn secondary" href="{{ url_for('manage_backgrounds') }}">Manage Website Backgrounds</a>
+      <a class="btn secondary" href="{{ url_for('manage_school_calendar') }}">Manage School Calendar</a>
+      <a class="btn secondary" href="{{ url_for('manage_subject_teachers') }}">Manage All Subject Teachers</a>
+      <a class="btn secondary" href="{{ url_for('student_portal_control') }}">Pupil Results Portal Control</a>
+      <a class="btn secondary" href="{{ url_for('student_records') }}">Pupil Registered Records / Total Pupils</a>
+      <a class="btn secondary" href="{{ url_for('donor_needs') }}">Public Donor Needs Page</a>
+      <a class="btn secondary" href="{{ url_for('donation_records') }}">Donation Pledge Records</a>
+      <a class="btn secondary" href="{{ url_for('staff_return_records') }}">Staff Return Records</a>
+      <a class="btn secondary" href="{{ url_for('manage_passwords') }}">Manage / Reset Portal Passwords</a>
+      <a class="btn secondary" href="{{ url_for('password_change_records') }}">Password Change Records</a>
+      <a class="btn secondary" href="{{ url_for('password_reset_email_outbox') }}">Password Reset Email Outbox</a>
+      <a class="btn secondary" href="{{ url_for('security_audit_records') }}">Security Audit Records</a>
+      {% if session.role == 'hr' %}<a class="btn secondary" href="{{ url_for('manage_staff_return_details') }}">Set Staff Return Details Required from Teachers</a>{% endif %}
+      <a class="btn secondary" href="{{ url_for('manage_school_calendar') }}">Manage School Calendar</a>
+      {% if session.role == 'headteacher' %}<a class="btn secondary" href="{{ url_for('edit_school_about') }}">Edit School About Page</a><a class="btn secondary" href="{{ url_for('edit_contact_location') }}">Edit Contact and Location</a>{% endif %}
+    </div>
+  {% endif %}
+
+
+
+  {% if session.role == 'deputy_headteacher' %}
+    <h3>Deputy Staff Management Panel</h3>
+    <div class="portal-actions admin-actions">
+      <a class="btn secondary" href="{{ url_for('leadership') }}">View Leadership, HR and HOD Profiles</a>
+      <a class="btn secondary" href="{{ url_for('manage_subject_teachers') }}">Manage HOD and Subject Teacher Profiles</a>
+      <a class="btn secondary" href="{{ url_for('student_portal_control') }}">Pupil Results Portal Control</a>
+      <a class="btn secondary" href="{{ url_for('student_records') }}">Pupil Registered Records / Total Pupils</a>
+      <a class="btn secondary" href="{{ url_for('departments') }}">View All Departments</a>
+      <a class="btn secondary" href="{{ url_for('manage_backgrounds') }}">Manage Website Backgrounds</a>
+      <a class="btn secondary" href="{{ url_for('manage_school_calendar') }}">Manage School Calendar</a>
+      <a class="btn secondary" href="{{ url_for('staff_return_records') }}">Staff Return Records</a>
+    </div>
+  {% endif %}
+
+  {% if session.role == 'student' %}
+    <h3>My Latest Results</h3>
+    <table>
+      <tr><th>Subject</th><th>Term</th><th>Year</th><th>Test 1</th><th>Test 2</th><th>End Term</th><th>Total</th><th>Average</th></tr>
+      {% for r in my_results %}
+        <tr><td>{{ r.subject }}</td><td>{{ r.term }}</td><td>{{ r.academic_year }}</td><td>{{ r.test1 }}</td><td>{{ r.test2 }}</td><td>{{ r.end_term }}</td><td>{{ r.total }}</td><td>{{ r.average }}</td></tr>
+      {% else %}
+        <tr><td colspan="8">No results uploaded yet.</td></tr>
+      {% endfor %}
+    </table>
+  {% else %}
+    <h3>Recent Materials</h3>
+    <table>
+      <tr><th>Title</th><th>Department</th><th>Date</th></tr>
+      {% for m in recent_materials %}
+        <tr><td>{{ m.title }}</td><td>{{ DEPARTMENTS[m.department] }}</td><td>{{ m.uploaded_at }}</td></tr>
+      {% else %}
+        <tr><td colspan="3">No materials uploaded yet.</td></tr>
+      {% endfor %}
+    </table>
+  {% endif %}
+</section>
+{% endblock %}

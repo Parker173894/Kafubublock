@@ -1,0 +1,37 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="page">
+  <h2>Donation Pledge Records</h2>
+  <p>These are donation pledges submitted by donors from the public website.</p>
+  <table>
+    <tr>
+      <th>Date</th><th>Donor</th><th>Contact</th><th>Need Supported</th><th>Type</th><th>Amount</th><th>Items / Message</th><th>Status</th><th>Action</th>
+    </tr>
+    {% for r in records %}
+      <tr>
+        <td>{{ r.pledged_at }}</td>
+        <td><b>{{ r.donor_name }}</b></td>
+        <td>{{ r.phone }}<br>{{ r.email }}</td>
+        <td>{{ r.need_item if r.need_item else 'General School Donation' }}</td>
+        <td>{{ r.donation_type }}</td>
+        <td>{{ r.amount }}</td>
+        <td>{{ r.item_description }}<br><span class="muted">{{ r.message }}</span></td>
+        <td><span class="badge">{{ r.status }}</span></td>
+        <td>
+          <form method="post" action="{{ url_for('update_donation_status', donation_id=r.id) }}">
+            <select name="status">
+              <option {% if r.status=='Pending' %}selected{% endif %}>Pending</option>
+              <option {% if r.status=='Contacted' %}selected{% endif %}>Contacted</option>
+              <option {% if r.status=='Received' %}selected{% endif %}>Received</option>
+              <option {% if r.status=='Cancelled' %}selected{% endif %}>Cancelled</option>
+            </select>
+            <button class="mini-btn" type="submit">Update</button>
+          </form>
+        </td>
+      </tr>
+    {% else %}
+      <tr><td colspan="9">No donation pledges submitted yet.</td></tr>
+    {% endfor %}
+  </table>
+</section>
+{% endblock %}

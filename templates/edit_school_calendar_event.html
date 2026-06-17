@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+{% block title %}Edit Calendar Event{% endblock %}
+{% block content %}
+<section class="auth">
+  <form method="POST" class="form-card wide-card">
+    <h2>Edit School Calendar Event</h2>
+    <label>Event Title</label>
+    <input type="text" name="title" value="{{ event.title }}" required>
+    <div class="cards three">
+      <div><label>Date</label><input type="date" name="event_date" value="{{ event.event_date }}" required></div>
+      <div><label>Start Time</label><input type="time" name="start_time" value="{{ event.start_time }}"></div>
+      <div><label>End Time</label><input type="time" name="end_time" value="{{ event.end_time }}"></div>
+    </div>
+    <div class="cards three">
+      <div><label>Category</label><input type="text" name="category" value="{{ event.category }}"></div>
+      <div><label>Venue</label><input type="text" name="venue" value="{{ event.venue }}"></div>
+      <div><label>Audience</label><input type="text" name="audience" value="{{ event.audience }}"></div>
+    </div>
+    <label>Description</label>
+    <textarea name="description">{{ event.description }}</textarea>
+    <button class="btn" type="submit">Update Calendar Event</button>
+    <a class="btn secondary" href="{{ url_for('manage_school_calendar') }}">Back</a>
+  </form>
+</section>
+{% endblock %}

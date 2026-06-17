@@ -1,0 +1,36 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="page">
+  <h2>Manage Donor Needs</h2>
+  <p>Add donor needs here. The Headteacher can also edit or delete existing donor needs.</p>
+  <form method="post" class="form-card wide">
+    <label>Item Needed</label><input name="item" required>
+    <label>Description</label><textarea name="description"></textarea>
+    <label>Quantity</label><input name="quantity">
+    <label>Priority</label><select name="priority"><option>High</option><option>Medium</option><option>Low</option></select>
+    <label>Estimated Cost</label><input name="estimated_cost">
+    <label>Status</label><select name="status"><option>Needed</option><option>Partly Supported</option><option>Supported</option></select>
+    <button class="btn">Add Need</button>
+  </form>
+
+  <h3>Existing Needs</h3>
+  <table>
+    <tr><th>Item</th><th>Quantity</th><th>Priority</th><th>Cost</th><th>Status</th>{% if session.role == 'headteacher' %}<th>Actions</th>{% endif %}</tr>
+    {% for n in needs %}
+      <tr>
+        <td>{{ n.item }}</td><td>{{ n.quantity }}</td><td>{{ n.priority }}</td><td>{{ n.estimated_cost }}</td><td>{{ n.status }}</td>
+        {% if session.role == 'headteacher' %}
+          <td>
+            <a class="btn small" href="{{ url_for('edit_donor_need', need_id=n.id) }}">Edit</a>
+            <form method="post" action="{{ url_for('delete_donor_need', need_id=n.id) }}" style="display:inline" onsubmit="return confirm('Delete this donor need?');">
+              <button class="btn danger small">Delete</button>
+            </form>
+          </td>
+        {% endif %}
+      </tr>
+    {% else %}
+      <tr><td colspan="6">No donor needs added yet.</td></tr>
+    {% endfor %}
+  </table>
+</section>
+{% endblock %}

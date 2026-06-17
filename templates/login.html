@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="auth">
+  <form method="post" class="form-card wide-card">
+    <h2>School Portal Login</h2>
+    <p class="hint">Enter your assigned username and password.</p>
+
+    <label>Username</label>
+    <input name="username" required autocomplete="username">
+
+    <label>Password</label>
+    <input name="password" type="password" required autocomplete="current-password">
+
+    <button class="btn" type="submit">Login</button>
+    <a class="btn secondary" href="{{ url_for('forgot_management_password') }}">Forgot Pass</a>
+  </form>
+</section>
+{% endblock %}

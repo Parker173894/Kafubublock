@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="page">
+  <h2>New Subject Teacher Registration</h2>
+  <p class="note">This section is only for HODs. Select the department where the new Subject Teacher belongs.</p>
+  <form method="post" enctype="multipart/form-data" class="form-card wide">
+    <h3>Portal Account</h3>
+    <label>Username</label><input name="username" required placeholder="Example: mr_mwamba">
+    <label>Create Password</label><input name="password" type="password" required placeholder="At least 8 characters, capital letter, small letter and number">
+    <label>Confirm Password</label><input name="confirm_password" type="password" required>
+
+    <h3>Teacher Profile Details</h3>
+    <label>Full Name</label><input name="full_name" required>
+    <label>Position / Responsibility</label><input name="position" value="Subject Teacher">
+    <label>Department</label>
+    <select name="department" required>
+      <option value="">-- Select Department --</option>
+      {% for key, name in DEPARTMENTS.items() %}
+        <option value="{{ key }}" {% if selected_department == key %}selected{% endif %}>{{ name }}</option>
+      {% endfor %}
+    </select>
+    <p class="note">Choose the department where this Subject Teacher should appear and be managed.</p>
+    <label>Subjects Taught</label><input name="subjects_taught" placeholder="Example: Mathematics, Biology">
+    <label>Phone</label><input name="phone">
+    <label>Email</label><input name="email" type="email">
+    <label>Qualification</label><input name="qualification" placeholder="Example: Diploma, Degree, Masters">
+    <label>Address</label><input name="address">
+    <label>Short Profile / Bio</label><textarea name="bio" placeholder="Briefly describe teaching experience, subjects and responsibilities"></textarea>
+    <label>Upload Profile Picture</label><input type="file" name="profile_picture" accept="image/*">
+    <button class="btn">Create Teacher Account</button><a class="btn secondary" href="{{ url_for('dashboard') }}">Back to Dashboard</a>
+  </form>
+</section>
+{% endblock %}

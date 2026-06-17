@@ -1,0 +1,1 @@
+{% extends 'base.html' %}{% block content %}<section class="page"><h2>Academic Departments</h2><div class="cards dept-grid">{% for key,name in DEPARTMENTS.items() %}<a class="card dept" href="{{ url_for('department_detail', dept=key) }}"><h3>{{ name }}</h3><p>View department profile and recently uploaded materials.</p></a>{% endfor %}</div></section>{% endblock %}

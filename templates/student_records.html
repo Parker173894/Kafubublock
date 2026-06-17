@@ -1,0 +1,66 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="page">
+  <h2>Pupil Registered Records</h2>
+  <p>This page is for HR and school management to view the school pupil register, total enrolment and summaries. HR can download the information in Excel for official records.</p>
+
+  <div class="cards three">
+    <div class="card stat"><h3>{{ total_students }}</h3><p>Total Pupils at School</p></div>
+    <div class="card stat"><h3>{{ filtered_total }}</h3><p>Records Displayed</p></div>
+    <div class="card stat"><h3>{{ grade_summary|length }}</h3><p>Forms / Grades Captured</p></div>
+  </div>
+
+  <form method="get" class="form-card wide">
+    <label>Filter by Grade/Form</label>
+    <select name="grade">
+      <option value="">All Grades / Forms</option>
+      {% for g in GRADES %}<option value="{{ g }}" {% if selected_grade == g %}selected{% endif %}>{{ g }}</option>{% endfor %}
+    </select>
+    <label>Filter by Class</label>
+    <select name="class_name">
+      <option value="">All Classes</option>
+      {% for c in classes %}<option value="{{ c.class_name }}" {% if selected_class == c.class_name %}selected{% endif %}>{{ c.class_name }}</option>{% endfor %}
+    </select>
+    <button class="btn">Apply Filter</button>
+    <a class="btn secondary" href="{{ url_for('student_records') }}">Clear Filter</a>
+    <a class="btn" href="{{ url_for('download_student_records_excel', grade=selected_grade, class_name=selected_class) }}">Download Excel</a>
+  </form>
+
+  <h3>Total Pupils by Grade/Form</h3>
+  <table>
+    <tr><th>Grade/Form</th><th>Total Pupils</th></tr>
+    {% for g in grade_summary %}<tr><td>{{ g.grade }}</td><td>{{ g.total }}</td></tr>{% else %}<tr><td colspan="2">No pupils registered yet.</td></tr>{% endfor %}
+  </table>
+
+  <h3>Total Pupils by Class</h3>
+  <table>
+    <tr><th>Grade/Form</th><th>Class</th><th>Total Pupils</th></tr>
+    {% for c in class_summary %}<tr><td>{{ c.grade }}</td><td>{{ c.class_name }}</td><td>{{ c.total }}</td></tr>{% else %}<tr><td colspan="3">No classes recorded yet.</td></tr>{% endfor %}
+  </table>
+
+  <h3>Total Pupils by Gender</h3>
+  <table>
+    <tr><th>Gender</th><th>Total Pupils</th></tr>
+    {% for g in gender_summary %}<tr><td>{{ g.gender }}</td><td>{{ g.total }}</td></tr>{% else %}<tr><td colspan="2">No gender records yet.</td></tr>{% endfor %}
+  </table>
+
+  <h3>Full Pupil Register</h3>
+  <table>
+    <tr><th>Pupil No.</th><th>Full Name</th><th>Grade/Form</th><th>Class</th><th>Class Teacher</th><th>Gender</th><th>Parent/Guardian Phone</th><th>Registration Date</th></tr>
+    {% for s in students %}
+      <tr>
+        <td>{{ s.student_number }}</td>
+        <td>{{ s.full_name }}</td>
+        <td>{{ s.grade }}</td>
+        <td>{{ s.class_name }}</td>
+        <td>{{ s.class_teacher or 'Not assigned' }}</td>
+        <td>{{ s.gender or 'Not indicated' }}</td>
+        <td>{{ s.parent_phone }}</td>
+        <td>{{ s.created_at }}</td>
+      </tr>
+    {% else %}
+      <tr><td colspan="8">No pupil records found.</td></tr>
+    {% endfor %}
+  </table>
+</section>
+{% endblock %}

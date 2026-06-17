@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="page">
+  <h2>Pupil Register</h2>
+  <p>Teachers, HODs, HR and school management can register learners from <b>Form 1</b> up to <b>Form 5</b>, and <b>Grade 10</b> to <b>Grade 12</b> before entering results.</p>
+  <form method="post" class="form-card wide">
+    <label>Pupil Number</label><input name="student_number" placeholder="Example: KBSS-004" required>
+    <label>Full Name</label><input name="full_name" required>
+    <label>Grade</label><select name="grade">{% for g in GRADES %}<option>{{ g }}</option>{% endfor %}</select>
+    <label>Class</label><input name="class_name" placeholder="Example: 1A, 2B, 3A, 4B, 5A, 10A, 11A or 12A" required>
+    <label>Class Teacher</label><input name="class_teacher" placeholder="Example: Mr/Ms Mwamba">
+    <label>Gender</label><select name="gender"><option>Female</option><option>Male</option></select>
+    <label>Parent/Guardian Phone</label><input name="parent_phone">
+    <button class="btn">Add Pupil</button>
+  </form>
+  <h3>Registered Pupils</h3>
+  <table>
+    <tr><th>Pupil No.</th><th>Name</th><th>Grade</th><th>Class</th><th>Class Teacher</th><th>Gender</th><th>Parent Phone</th><th>Action</th></tr>
+    {% for s in students %}
+      <tr>
+        <td>{{ s.student_number }}</td><td>{{ s.full_name }}</td><td>{{ s.grade }}</td><td>{{ s.class_name }}</td><td>{{ s.class_teacher or 'Not assigned' }}</td><td>{{ s.gender }}</td><td>{{ s.parent_phone }}</td>
+        <td>
+          <form method="post" action="{{ url_for('delete_student', student_id=s.id) }}" onsubmit="return confirm('Delete this pupil? This will also delete the pupil login account and all related results.');">
+            <button class="btn danger" type="submit">Delete</button>
+          </form>
+        </td>
+      </tr>
+    {% else %}<tr><td colspan="8">No pupils registered yet.</td></tr>{% endfor %}
+  </table>
+</section>
+{% endblock %}

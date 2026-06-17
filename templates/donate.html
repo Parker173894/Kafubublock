@@ -1,0 +1,55 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="page auth">
+  <form method="post" class="form-card wide">
+    <h2>Donate to Kafubu Block Secondary School</h2>
+    <p class="hint">Please fill in this form to pledge support. The school will contact you using the phone number or email you provide.</p>
+
+    <label>Choose school need to support</label>
+    <select name="need_id">
+      <option value="general">General School Donation</option>
+      {% for n in needs %}
+        <option value="{{ n.id }}" {% if selected_need and selected_need.id == n.id %}selected{% endif %}>{{ n.item }} - {{ n.estimated_cost }}</option>
+      {% endfor %}
+    </select>
+
+    <label>Donor Name / Organisation Name</label>
+    <input type="text" name="donor_name" required placeholder="Example: Mr Banda or ABC Company">
+
+    <label>Email Address</label>
+    <input type="email" name="email" placeholder="example@email.com">
+
+    <label>Phone Number</label>
+    <input type="text" name="phone" placeholder="+260...">
+
+    <label>Type of Donation</label>
+    <select name="donation_type">
+      <option>Money</option>
+      <option>Materials / Items</option>
+      <option>Service / Labour</option>
+      <option>Other Support</option>
+    </select>
+
+    <label>Amount Pledged</label>
+    <input type="text" name="amount" placeholder="Example: K500, K2,000 or leave blank for item donation">
+
+    <label>Items / Support Description</label>
+    <textarea name="item_description" placeholder="Example: 10 bags of cement, 5 computers, textbooks, desks, painting service"></textarea>
+
+    <label>Preferred Donation Method</label>
+    <select name="payment_method">
+      <option>Contact me first</option>
+      <option>Cash donation</option>
+      <option>Bank transfer</option>
+      <option>Mobile money</option>
+      <option>Deliver items to school</option>
+    </select>
+
+    <label>Message to the School</label>
+    <textarea name="message" placeholder="Write any message or condition for your donation"></textarea>
+
+    <button class="btn" type="submit">Submit Donation Pledge</button>
+    <a class="btn secondary" href="{{ url_for('donor_needs') }}">Back to Donor Needs</a>
+  </form>
+</section>
+{% endblock %}

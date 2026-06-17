@@ -1,0 +1,29 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="page">
+  <h2>Security Audit Records</h2>
+  <p>This page shows important security events such as successful logins, failed logins, blocked login attempts and logouts.</p>
+  <table>
+    <tr>
+      <th>Date / Time</th>
+      <th>Event</th>
+      <th>Username</th>
+      <th>Role</th>
+      <th>IP Address</th>
+      <th>Details</th>
+    </tr>
+    {% for r in records %}
+    <tr>
+      <td>{{ r.created_at }}</td>
+      <td>{{ r.event_type }}</td>
+      <td>{{ r.username or '' }}</td>
+      <td>{{ r.role or '' }}</td>
+      <td>{{ r.ip_address or '' }}</td>
+      <td>{{ r.details or '' }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="6">No security records found.</td></tr>
+    {% endfor %}
+  </table>
+</section>
+{% endblock %}

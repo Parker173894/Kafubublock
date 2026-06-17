@@ -1,0 +1,49 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="page">
+  <h2>Upload / Manage Website Background Pictures</h2>
+  <p>Headteacher, Deputy Headteacher and HODs can upload up to <strong>10 school pictures at once</strong>. Active pictures will run as a changing background slideshow across the whole website and will change automatically after 15 seconds.</p>
+
+  <form method="post" enctype="multipart/form-data" class="form-card wide">
+    <input type="hidden" name="action" value="upload">
+    <label>Background Title / Group Name</label>
+    <input type="text" name="title" placeholder="Example: School Environment, Assembly, Classrooms" required>
+
+    <label>Choose up to 10 Pictures</label>
+    <input type="file" name="background_images" accept="image/*" multiple required>
+    <p class="hint">You can select many pictures at the same time. Hold CTRL on Windows while clicking pictures. Maximum: 10 pictures per upload. Allowed images: JPG, PNG, GIF or WEBP.</p>
+
+    <button class="btn" type="submit">Upload Background Pictures</button>
+    <a class="btn secondary" href="{{ url_for('dashboard') }}">Back to Dashboard</a>
+  </form>
+
+  <h3>Uploaded Background Pictures</h3>
+  <p class="hint">Only pictures marked <strong>Active</strong> will appear in the changing website background slideshow.</p>
+  <table class="background-table">
+    <tr><th>Preview</th><th>Title</th><th>Uploaded By</th><th>Date</th><th>Status</th><th>Action</th></tr>
+    {% for bg in backgrounds %}
+      <tr>
+        <td><img class="bg-preview" src="{{ url_for('background_picture', filename=bg.filename) }}" alt="Background picture"></td>
+        <td>{{ bg.title }}</td>
+        <td>{{ bg.uploaded_by }}</td>
+        <td>{{ bg.uploaded_at }}</td>
+        <td>{% if bg.is_active == 'Yes' %}<span class="status-active">Active</span>{% else %}<span class="status-inactive">Inactive</span>{% endif %}</td>
+        <td>
+          <form method="post" style="display:inline">
+            <input type="hidden" name="action" value="toggle">
+            <input type="hidden" name="bg_id" value="{{ bg.id }}">
+            <button class="mini-btn" type="submit">{% if bg.is_active == 'Yes' %}Deactivate{% else %}Activate{% endif %}</button>
+          </form>
+          <form method="post" style="display:inline" onsubmit="return confirm('Delete this background picture?')">
+            <input type="hidden" name="action" value="delete">
+            <input type="hidden" name="bg_id" value="{{ bg.id }}">
+            <button class="mini-btn danger" type="submit">Delete</button>
+          </form>
+        </td>
+      </tr>
+    {% else %}
+      <tr><td colspan="6">No background pictures uploaded yet.</td></tr>
+    {% endfor %}
+  </table>
+</section>
+{% endblock %}

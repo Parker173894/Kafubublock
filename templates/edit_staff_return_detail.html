@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="page">
+  <h2>Edit Staff Return Detail</h2>
+  <form method="post" class="form-card wide">
+    <div class="grid two">
+      <label>Detail Name / Question<input name="field_label" value="{{ field.field_label }}" required></label>
+      <label>Section<input name="section" value="{{ field.section }}"></label>
+      <label>Type of Answer<select name="field_type">{% for typ, label in [('text','Short text'),('textarea','Long text'),('number','Number'),('date','Date'),('email','Email'),('select','Dropdown list')] %}<option value="{{ typ }}" {% if field.field_type==typ %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+      <label>Options for Dropdown<input name="options" value="{{ field.options or '' }}"></label>
+      <label>Required?<select name="is_required"><option value="Yes" {% if field.is_required=='Yes' %}selected{% endif %}>Yes</option><option value="No" {% if field.is_required=='No' %}selected{% endif %}>No</option></select></label>
+      <label>Active?<select name="is_active"><option value="Yes" {% if field.is_active=='Yes' %}selected{% endif %}>Yes</option><option value="No" {% if field.is_active=='No' %}selected{% endif %}>No</option></select></label>
+      <label>Display Order<input type="number" name="display_order" value="{{ field.display_order }}" min="1"></label>
+    </div>
+    <button class="btn" type="submit">Save Changes</button><a class="btn secondary" href="{{ url_for('manage_staff_return_details') }}">Cancel</a>
+  </form>
+</section>
+{% endblock %}

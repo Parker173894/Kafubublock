@@ -1,0 +1,56 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="hero home-hero">
+  <div>
+    <h2>Welcome to Kafubu Block Secondary School</h2>
+    <p>A digital platform for learning materials, results, school administration, official documents, leadership profiles and donor support.</p>
+    <a class="btn" href="{{ url_for('departments') }}">View Departments</a>
+    <a class="btn ghost" href="{{ url_for('login') }}">Portal Login</a>
+  </div>
+
+  <div class="card homepage-guidance-card">
+    <h3>Guidance and Counselling</h3>
+    <p>Latest educative posts and videos shared by Guidance and Counselling Teachers.</p>
+
+    <div class="guidance-preview-list">
+      {% for post in guidance_posts %}
+        <article class="guidance-preview-item">
+          <h4>{{ post.title }}</h4>
+          <p><span class="badge">{{ post.category }}</span></p>
+          <p>{{ post.message }}</p>
+          {% if post.video_filename %}
+            <video controls class="video-box homepage-video-box">
+              <source src="{{ url_for('guidance_video', filename=post.video_filename) }}">
+              Your browser does not support video playback.
+            </video>
+          {% endif %}
+          <p class="muted">Posted by {{ post.posted_by }} on {{ post.posted_at }}</p>
+        </article>
+      {% else %}
+        <div class="guidance-preview-item">
+          <p>No guidance posts or videos have been uploaded yet.</p>
+        </div>
+      {% endfor %}
+    </div>
+
+    <a class="btn" href="{{ url_for('guidance_posts') }}">View All Guidance Posts / Videos</a>
+  </div>
+</section>
+
+<section class="cards three">
+  <div class="card"><h3>Department Materials</h3><p>HODs upload schemes, lesson plans, tests, notes and other materials. Teachers download them anytime.</p></div>
+  <div class="card"><h3>Pupil Results Portal</h3><p>Pupils can login and view their Test 1, Test 2 and End Term marks after teachers upload results.</p></div>
+  <div class="card"><h3>Headteacher, Deputy and HR Portal</h3><p>School leadership and HR upload circulars, duty schedules, policies, staff documents and important work documents.</p></div>
+  <div class="card"><h3>Staff Profiles</h3><p>Staff members can update their own profiles and upload profile pictures.</p></div>
+  <div class="card"><h3>Donor Support</h3><p>Donors can view the school needs list and support infrastructure, books, furniture, computers and laboratory resources.</p><a class="btn" href="{{ url_for('donate') }}">Click to Donate</a></div>
+</section>
+
+<section>
+  <h2>Current Priority Needs</h2>
+  <div class="cards three">
+    {% for need in needs %}
+      <div class="card need"><span>{{ need.priority }}</span><h3>{{ need.item }}</h3><p>{{ need.description }}</p><p><b>Quantity:</b> {{ need.quantity }}</p><a class="btn" href="{{ url_for('donate', need_id=need.id) }}">Donate / Pledge Support</a></div>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}

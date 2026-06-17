@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="page">
+  <h2>Pupil Results Portal</h2>
+  <p><a class="btn secondary" href="{{ url_for('result_analysis') }}">Open Result Analysis</a></p>
+  {% if students %}
+    <form method="get" class="inline-form">
+      <select name="student_id"><option value="">Select Pupil</option>{% for s in students %}<option value="{{ s.id }}" {% if student and student.id==s.id %}selected{% endif %}>{{ s.student_number }} - {{ s.full_name }}</option>{% endfor %}</select>
+      <button class="mini-btn">View Results</button>
+    </form>
+  {% endif %}
+  {% if student %}
+    <div class="card">
+      <h3>{{ student.full_name }}</h3>
+      <p><b>Pupil Number:</b> {{ student.student_number }}</p>
+      <p><b>Class:</b> {{ student.grade }} {{ student.class_name }}</p>
+      <p><b>Class Teacher:</b> {{ student.class_teacher or 'Not assigned' }}</p>
+      <p><a class="btn" href="{{ url_for('download_my_result_pdf', student_id=student.id) }}">Download Results in PDF</a></p>
+    </div>
+    <table>
+      <tr><th>Subject</th><th>Term</th><th>Year</th><th>Test 1</th><th>Test 2</th><th>End Term</th><th>Total</th><th>Average</th><th>Comment</th></tr>
+      {% for r in results %}<tr><td>{{ r.subject }}</td><td>{{ r.term }}</td><td>{{ r.academic_year }}</td><td>{{ r.test1 }}</td><td>{{ r.test2 }}</td><td>{{ r.end_term }}</td><td>{{ r.total }}</td><td>{{ r.average }}</td><td>{{ r.comment }}</td></tr>{% else %}<tr><td colspan="9">No results uploaded yet.</td></tr>{% endfor %}
+    </table>
+  {% else %}
+    <p class="hint">Select a pupil to view results, or login as a pupil to view your own results.</p>
+  {% endif %}
+</section>
+{% endblock %}

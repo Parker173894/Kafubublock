@@ -1,0 +1,86 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="page">
+  <h2>{% if session.role == 'student' %}My Result Analysis{% else %}Pupil Result Analysis{% endif %}</h2>
+  <p>This page analyses Test 1, Test 2 and End Term marks, then shows averages, strongest subject, weakest subject and pass/fail summary.</p>
+
+  {% if students %}
+  <form method="get" class="form-card wide">
+    <h3>Filter Analysis</h3>
+    <label>Pupil</label>
+    <select name="student_id">
+      <option value="">All Pupils</option>
+      {% for s in students %}<option value="{{ s.id }}" {% if selected_student_id|string == s.id|string %}selected{% endif %}>{{ s.student_number }} - {{ s.full_name }} ({{ s.grade }} {{ s.class_name }})</option>{% endfor %}
+    </select>
+    <label>Grade/Form</label>
+    <select name="grade">
+      <option value="">All Grades</option>
+      {% for g in GRADES %}<option value="{{ g }}" {% if selected_grade==g %}selected{% endif %}>{{ g }}</option>{% endfor %}
+    </select>
+    <label>Term</label>
+    <select name="term">
+      <option value="">All Terms</option>
+      {% for t in TERMS %}<option value="{{ t }}" {% if selected_term==t %}selected{% endif %}>{{ t }}</option>{% endfor %}
+    </select>
+    <label>Academic Year</label>
+    <input name="academic_year" value="{{ selected_year }}" placeholder="Example: 2026">
+    <button class="btn">View Analysis</button>
+  </form>
+  {% endif %}
+
+  {% if session.role in FULL_ACCESS_ROLES or session.role.startswith('hod_') or session.role == 'deputy_headteacher' %}
+    <p><a class="btn secondary" href="{{ url_for('download_result_analysis', grade=selected_grade, term=selected_term, academic_year=selected_year) }}">Download Result Analysis CSV</a></p>
+  {% endif %}
+
+  {% if student %}
+    <div class="card">
+      <h3>{{ student.full_name }}</h3>
+      <p><b>Pupil Number:</b> {{ student.student_number }}</p>
+      <p><b>Class:</b> {{ student.grade }} {{ student.class_name }}</p>
+    </div>
+  {% endif %}
+
+  <div class="cards three">
+    <div class="card stat"><h3>{{ analysis.total_subjects }}</h3><p>Result Entries</p></div>
+    <div class="card stat"><h3>{{ analysis.overall_average }}%</h3><p>Overall Average</p></div>
+    <div class="card stat"><h3>{{ analysis.status }}</h3><p>Performance Status</p></div>
+    <div class="card stat"><h3>{{ analysis.best_subject }}</h3><p>Best Subject: {{ analysis.best_average }}%</p></div>
+    <div class="card stat"><h3>{{ analysis.weakest_subject }}</h3><p>Weakest Subject: {{ analysis.weakest_average }}%</p></div>
+    <div class="card stat"><h3>{{ analysis.pass_count }} / {{ analysis.fail_count }}</h3><p>Pass / Needs Improvement</p></div>
+  </div>
+
+  <h3>Assessment Average Analysis</h3>
+  <table>
+    <tr><th>Assessment</th><th>Average Mark</th></tr>
+    <tr><td>Test 1 Average</td><td>{{ analysis.average_test1 }}%</td></tr>
+    <tr><td>Test 2 Average</td><td>{{ analysis.average_test2 }}%</td></tr>
+    <tr><td>End Term Average</td><td>{{ analysis.average_end_term }}%</td></tr>
+  </table>
+
+  {% if subject_summary %}
+  <h3>Subject Summary</h3>
+  <table>
+    <tr><th>Subject</th><th>Entries</th><th>Test 1 Avg</th><th>Test 2 Avg</th><th>End Term Avg</th><th>Overall Avg</th></tr>
+    {% for s in subject_summary %}<tr><td>{{ s.subject }}</td><td>{{ s.entries }}</td><td>{{ s.avg_test1 }}</td><td>{{ s.avg_test2 }}</td><td>{{ s.avg_end_term }}</td><td>{{ s.avg_mark }}</td></tr>{% endfor %}
+  </table>
+  {% endif %}
+
+  {% if grade_summary %}
+  <h3>Grade/Form Summary</h3>
+  <table>
+    <tr><th>Grade/Form</th><th>Entries</th><th>Average Mark</th></tr>
+    {% for g in grade_summary %}<tr><td>{{ g.grade }}</td><td>{{ g.entries }}</td><td>{{ g.avg_mark }}</td></tr>{% endfor %}
+  </table>
+  {% endif %}
+
+  <h3>Detailed Results Used in This Analysis</h3>
+  <table>
+    <tr><th>Pupil</th><th>Subject</th><th>Grade</th><th>Term</th><th>Year</th><th>Test 1</th><th>Test 2</th><th>End Term</th><th>Total</th><th>Average</th><th>Comment</th></tr>
+    {% for r in rows %}
+      <tr><td>{% if r.full_name is defined %}{{ r.student_number }} - {{ r.full_name }}{% else %}{{ student.full_name if student else '' }}{% endif %}</td><td>{{ r.subject }}</td><td>{{ r.grade }}</td><td>{{ r.term }}</td><td>{{ r.academic_year }}</td><td>{{ r.test1 }}</td><td>{{ r.test2 }}</td><td>{{ r.end_term }}</td><td>{{ r.total }}</td><td>{{ r.average }}</td><td>{{ r.comment }}</td></tr>
+    {% else %}
+      <tr><td colspan="11">No results available for analysis.</td></tr>
+    {% endfor %}
+  </table>
+</section>
+{% endblock %}
