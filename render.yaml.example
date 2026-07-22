@@ -1,0 +1,42 @@
+# Example for creating a NEW Render Blueprint service.
+# For an existing service, use RENDER_DEPLOYMENT_GUIDE.txt and update its Dashboard settings instead.
+services:
+  - type: web
+    name: kafubu-school-portal
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn --workers 1 --threads 4 --timeout 120 --bind 0.0.0.0:$PORT wsgi:app
+    healthCheckPath: /
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: FLASK_SECRET_KEY
+        generateValue: true
+      - key: INITIAL_ADMIN_PASSWORD
+        sync: false
+      - key: RECOVERY_ALLOWED_EMAIL
+        sync: false
+      - key: TRUST_PROXY
+        value: "1"
+      - key: DATA_DIR
+        value: /var/data
+      - key: BACKUP_DIR
+        value: /var/data/backups
+      - key: AUTO_BACKUP_ENABLED
+        value: "1"
+      - key: AUTO_BACKUP_HOURS
+        value: "24"
+      - key: BACKUP_RETENTION
+        value: "30"
+      - key: MAX_UPLOAD_MB
+        value: "50"
+      - key: MAX_GUIDANCE_VIDEO_MB
+        value: "50"
+      - key: MAX_DOCUMENT_MB
+        value: "25"
+      - key: MAX_IMAGE_MB
+        value: "8"
+    disk:
+      name: kafubu-data
+      mountPath: /var/data
+      sizeGB: 1

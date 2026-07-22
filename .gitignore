@@ -1,0 +1,12 @@
+.env
+.secret_key
+school.db
+backups/
+__pycache__/
+*.pyc
+uploads/*
+!uploads/materials/
+!uploads/documents/
+!uploads/profile_pics/
+!uploads/guidance_videos/
+!uploads/backgrounds/

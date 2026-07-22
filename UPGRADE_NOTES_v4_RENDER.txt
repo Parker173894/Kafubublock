@@ -1,0 +1,22 @@
+KAFUBU PORTAL VERSION 4 - RENDER HOSTING READINESS
+==================================================
+
+- Added DATA_DIR so Render can store all changing data on a persistent disk.
+- school.db is stored at DATA_DIR/school.db.
+- uploads are stored below DATA_DIR/uploads.
+- backups default to DATA_DIR/backups.
+- Backup creation and restoration now work correctly when data is outside the
+  source-code directory.
+- Added RENDER_DEPLOYMENT_GUIDE.txt for upgrading an existing service safely.
+- Added render.yaml.example as a reference for new Blueprint services.
+- Added a tested Gunicorn start command for Render.
+- Running python app.py locally now automatically starts development/demo mode,
+  preventing the FLASK_SECRET_KEY production error during VS Code testing.
+
+RENDER SETTINGS SUMMARY
+-----------------------
+Persistent disk mount: /var/data
+DATA_DIR: /var/data
+BACKUP_DIR: /var/data/backups
+Build: pip install -r requirements.txt
+Start: gunicorn --workers 1 --threads 4 --timeout 120 --bind 0.0.0.0:$PORT wsgi:app

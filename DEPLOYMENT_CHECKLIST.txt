@@ -1,0 +1,26 @@
+KAFUBU PORTAL DEPLOYMENT CHECKLIST
+==================================
+
+[ ] Download the current live school.db.
+[ ] Download the current live uploads folder.
+[ ] Stop the hosted service.
+[ ] Upload the new code without replacing school.db or uploads.
+[ ] Set APP_ENV=production.
+[ ] Set a new FLASK_SECRET_KEY containing at least 32 random characters.
+[ ] Set INITIAL_ADMIN_PASSWORD to a strong temporary Headteacher password.
+[ ] Set RECOVERY_ALLOWED_EMAIL to the official recovery email.
+[ ] Configure SMTP email settings.
+[ ] Confirm HTTPS is working.
+[ ] Confirm school.db, uploads and backups use persistent storage.
+[ ] On Render, confirm a persistent disk is mounted and DATA_DIR matches it.
+[ ] Install requirements and start with gunicorn wsgi:app.
+[ ] Log in as Headteacher and create a private password.
+[ ] Reset any older accounts that were disabled for using demo passwords.
+[ ] Confirm the pupil results portal is inactive until results are ready.
+[ ] Create and download a complete backup.
+[ ] Test Headteacher, HR, HOD, teacher and pupil logins.
+[ ] Confirm Teacher Login opens the teacher's own editable profile.
+[ ] Confirm an HOD can register a teacher and create the temporary password.
+[ ] Confirm the HOD's department is assigned automatically and cannot be changed.
+[ ] Confirm teacher profile edits appear immediately on the department page.
+[ ] Check the new navigation and portal pages on a phone-sized screen.

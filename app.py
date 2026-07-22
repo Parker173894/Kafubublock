@@ -3,13 +3,20 @@ import sqlite3
 import csv
 import secrets
 import smtplib
+import json
+import hashlib
+import shutil
+import tempfile
+import zipfile
 from email.message import EmailMessage
 from io import StringIO, BytesIO
 from datetime import datetime, timedelta
 from functools import wraps
-from flask import Flask, render_template, request, redirect, url_for, session, flash, send_from_directory, send_file
+from flask import Flask, render_template, request, redirect, url_for, session, flash, send_from_directory, send_file, abort
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.middleware.proxy_fix import ProxyFix
+from werkzeug.exceptions import RequestEntityTooLarge
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -21,6 +28,22 @@ from openpyxl.utils import get_column_letter
 
 app = Flask(__name__)
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+DEFAULT_APP_ENV = 'development' if __name__ == '__main__' else 'production'
+APP_ENV = os.environ.get('APP_ENV', DEFAULT_APP_ENV).strip().lower()
+IS_PRODUCTION = APP_ENV == 'production'
+DEMO_MODE = os.environ.get('APP_DEMO_MODE', '1' if DEFAULT_APP_ENV == 'development' else '0') == '1'
+
+if os.environ.get('TRUST_PROXY', '0') == '1':
+    # Enable only when the hosting provider supplies trusted proxy headers.
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+
+
+def _env_int(name, default, minimum, maximum):
+    try:
+        value = int(os.environ.get(name, str(default)))
+    except (TypeError, ValueError):
+        value = default
+    return max(minimum, min(value, maximum))
 
 # SECURITY SETTINGS
 # The secret key protects sessions. It is generated once and stored locally,
@@ -29,6 +52,8 @@ def _load_secret_key():
     env_key = os.environ.get('FLASK_SECRET_KEY')
     if env_key and len(env_key) >= 32:
         return env_key
+    if IS_PRODUCTION:
+        raise RuntimeError('FLASK_SECRET_KEY must be set to a random value of at least 32 characters in production.')
     key_file = os.path.join(BASE_DIR, '.secret_key')
     if os.path.exists(key_file):
         with open(key_file, 'r', encoding='utf-8') as f:
@@ -39,23 +64,29 @@ def _load_secret_key():
     return key
 
 app.secret_key = _load_secret_key()
+MAX_UPLOAD_MB = _env_int('MAX_UPLOAD_MB', 50, 5, 100)
 app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE='Lax',
+    SESSION_COOKIE_SECURE=IS_PRODUCTION,
+    SESSION_COOKIE_NAME='kbss_session',
     PERMANENT_SESSION_LIFETIME=timedelta(minutes=45),
-    MAX_CONTENT_LENGTH=750 * 1024 * 1024,  # maximum upload size: 750MB for guidance and counselling videos
+    MAX_CONTENT_LENGTH=MAX_UPLOAD_MB * 1024 * 1024,
+    PREFERRED_URL_SCHEME='https' if IS_PRODUCTION else 'http',
 )
-# Enable this only when hosted using HTTPS. Do not enable on local http://127.0.0.1
-if os.environ.get('FLASK_HTTPS_ONLY') == '1':
-    app.config['SESSION_COOKIE_SECURE'] = True
-DB_PATH = os.path.join(BASE_DIR, 'school.db')
-MATERIAL_DIR = os.path.join(BASE_DIR, 'uploads', 'materials')
-DOCUMENT_DIR = os.path.join(BASE_DIR, 'uploads', 'documents')
-PROFILE_DIR = os.path.join(BASE_DIR, 'uploads', 'profile_pics')
-GUIDANCE_VIDEO_DIR = os.path.join(BASE_DIR, 'uploads', 'guidance_videos')
-BACKGROUND_DIR = os.path.join(BASE_DIR, 'uploads', 'backgrounds')
+DATA_DIR = os.path.abspath(os.environ.get('DATA_DIR', '').strip() or BASE_DIR)
+os.makedirs(DATA_DIR, exist_ok=True)
+DB_PATH = os.path.join(DATA_DIR, 'school.db')
+BACKUP_DIR = os.path.abspath(os.environ.get('BACKUP_DIR', '').strip() or os.path.join(DATA_DIR, 'backups'))
+UPLOAD_ROOT = os.path.join(DATA_DIR, 'uploads')
+MATERIAL_DIR = os.path.join(UPLOAD_ROOT, 'materials')
+DOCUMENT_DIR = os.path.join(UPLOAD_ROOT, 'documents')
+PROFILE_DIR = os.path.join(UPLOAD_ROOT, 'profile_pics')
+GUIDANCE_VIDEO_DIR = os.path.join(UPLOAD_ROOT, 'guidance_videos')
+BACKGROUND_DIR = os.path.join(UPLOAD_ROOT, 'backgrounds')
 for d in [MATERIAL_DIR, DOCUMENT_DIR, PROFILE_DIR, GUIDANCE_VIDEO_DIR, BACKGROUND_DIR]:
     os.makedirs(d, exist_ok=True)
+os.makedirs(BACKUP_DIR, exist_ok=True)
 
 DEPARTMENTS = {
     'mathematics': 'Mathematics Department',
@@ -79,7 +110,7 @@ LEADERSHIP_ROLES = ['headteacher', 'deputy_headteacher', 'hr']
 STAFF_ROLES = ['teacher', 'headteacher', 'deputy_headteacher', 'hr', 'guidance_counselling'] + list(ROLE_TO_DEPT.keys())
 BACKGROUND_MANAGEMENT_ROLES = ['headteacher', 'deputy_headteacher'] + list(ROLE_TO_DEPT.keys())
 CALENDAR_MANAGEMENT_ROLES = ['headteacher', 'deputy_headteacher', 'hr'] + list(ROLE_TO_DEPT.keys())
-RECOVERY_ALLOWED_EMAIL = 'brucemwamba656@gmail.com'
+RECOVERY_ALLOWED_EMAIL = os.environ.get('RECOVERY_ALLOWED_EMAIL', '').strip().lower()
 TERMS = ['Term 1', 'Term 2', 'Term 3']
 GRADES = ['Form 1', 'Form 2', 'Form 3', 'Form 4', 'Form 5', 'Grade 10', 'Grade 11', 'Grade 12']
 
@@ -89,8 +120,15 @@ ALLOWED_DOCUMENT_EXTENSIONS = {'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx
 ALLOWED_VIDEO_EXTENSIONS = {'mp4', 'webm', 'mov'}
 LOGIN_MAX_ATTEMPTS = 5
 LOGIN_LOCK_MINUTES = 15
-MAX_GUIDANCE_VIDEO_MB = 750
+MAX_GUIDANCE_VIDEO_MB = _env_int('MAX_GUIDANCE_VIDEO_MB', 50, 1, MAX_UPLOAD_MB)
 MAX_GUIDANCE_VIDEO_BYTES = MAX_GUIDANCE_VIDEO_MB * 1024 * 1024
+MAX_IMAGE_MB = _env_int('MAX_IMAGE_MB', 8, 1, MAX_UPLOAD_MB)
+MAX_DOCUMENT_MB = _env_int('MAX_DOCUMENT_MB', 25, 1, MAX_UPLOAD_MB)
+MAX_IMAGE_BYTES = MAX_IMAGE_MB * 1024 * 1024
+MAX_DOCUMENT_BYTES = MAX_DOCUMENT_MB * 1024 * 1024
+AUTO_BACKUP_ENABLED = os.environ.get('AUTO_BACKUP_ENABLED', '1' if IS_PRODUCTION else '0') == '1'
+AUTO_BACKUP_HOURS = _env_int('AUTO_BACKUP_HOURS', 24, 1, 168)
+BACKUP_RETENTION = _env_int('BACKUP_RETENTION', 30, 3, 365)
 
 
 def get_db():
@@ -102,6 +140,71 @@ def get_db():
 def column_exists(cursor, table, column):
     cursor.execute(f'PRAGMA table_info({table})')
     return any(row[1] == column for row in cursor.fetchall())
+
+
+DEMO_CREDENTIALS = {
+    'head': 'head123', 'deputy': 'deputy123', 'hr': 'hr123',
+    'teacher': 'teacher123', 'guidance': 'guidance123',
+    'hod_math': 'math123', 'hod_natural': 'natural123',
+    'hod_social': 'social123', 'hod_computer': 'computer123',
+    'hod_business': 'business123', 'hod_home': 'home123',
+    'hod_language': 'language123', 'student1': 'student123',
+    'student2': 'student123',
+}
+
+
+def harden_production_accounts(cursor):
+    """Disable known demo credentials and guarantee one secure bootstrap administrator."""
+    if not IS_PRODUCTION or DEMO_MODE:
+        return
+
+    bootstrap_password = os.environ.get('INITIAL_ADMIN_PASSWORD', '')
+    head = cursor.execute("SELECT * FROM users WHERE username='head'").fetchone()
+    head_uses_default = bool(head and check_password_hash(head['password'], DEMO_CREDENTIALS['head']))
+
+    if not head or head_uses_default:
+        ok, message = password_is_strong(bootstrap_password)
+        if not ok or len(bootstrap_password) < 12:
+            raise RuntimeError(
+                'Set INITIAL_ADMIN_PASSWORD to at least 12 characters with uppercase, lowercase and a number. '
+                'It is required when installing the production upgrade or replacing the default Headteacher password.'
+            )
+        if head:
+            cursor.execute(
+                "UPDATE users SET password=?, must_change_password=1, is_active=1 WHERE id=?",
+                (generate_password_hash(bootstrap_password), head['id'])
+            )
+        else:
+            cursor.execute('''INSERT INTO users(
+                username,password,role,full_name,position,email,must_change_password,is_active
+            ) VALUES(?,?,?,?,?,?,1,1)''', (
+                'head', generate_password_hash(bootstrap_password), 'headteacher',
+                'Headteacher', 'Head Teacher', RECOVERY_ALLOWED_EMAIL
+            ))
+
+    for username, known_password in DEMO_CREDENTIALS.items():
+        if username == 'head':
+            continue
+        user = cursor.execute('SELECT * FROM users WHERE username=?', (username,)).fetchone()
+        if user and check_password_hash(user['password'], known_password):
+            cursor.execute(
+                'UPDATE users SET password=?, must_change_password=1, is_active=0 WHERE id=?',
+                (generate_password_hash(secrets.token_urlsafe(32)), user['id'])
+            )
+
+    # Remove only the unmistakable demonstration pupil records shipped in older packages.
+    sample_numbers = ('KBSS-001', 'KBSS-002', 'KBSS-003')
+    placeholders = ','.join('?' for _ in sample_numbers)
+    sample_rows = cursor.execute(
+        f"SELECT id, student_number FROM students WHERE student_number IN ({placeholders}) AND full_name LIKE 'Sample Learner%'",
+        sample_numbers
+    ).fetchall()
+    for sample in sample_rows:
+        cursor.execute('DELETE FROM results WHERE student_id=?', (sample['id'],))
+        cursor.execute('DELETE FROM result_download_logs WHERE student_id=? OR student_number=?', (sample['id'], sample['student_number']))
+        cursor.execute("DELETE FROM users WHERE role='student' AND student_number=?", (sample['student_number'],))
+        cursor.execute('DELETE FROM students WHERE id=?', (sample['id'],))
+    cursor.execute("UPDATE password_reset_tokens SET used='Yes' WHERE used='No' AND length(token) != 64")
 
 
 def init_db():
@@ -120,10 +223,17 @@ def init_db():
         address TEXT,
         qualification TEXT,
         profile_picture TEXT,
-        student_number TEXT
+        student_number TEXT,
+        must_change_password INTEGER NOT NULL DEFAULT 0,
+        is_active INTEGER NOT NULL DEFAULT 1,
+        profile_updated_at TEXT
     )''')
     # Safe upgrades for older database versions
-    for col, coltype in [('address','TEXT'), ('qualification','TEXT'), ('profile_picture','TEXT'), ('student_number','TEXT')]:
+    for col, coltype in [
+        ('address','TEXT'), ('qualification','TEXT'), ('profile_picture','TEXT'),
+        ('student_number','TEXT'), ('must_change_password','INTEGER NOT NULL DEFAULT 0'),
+        ('is_active','INTEGER NOT NULL DEFAULT 1'), ('profile_updated_at','TEXT')
+    ]:
         if not column_exists(c, 'users', col):
             c.execute(f'ALTER TABLE users ADD COLUMN {col} {coltype}')
 
@@ -149,7 +259,7 @@ def init_db():
     )''')
     if not c.execute('SELECT setting_value FROM portal_settings WHERE setting_key=?', ('student_results_active',)).fetchone():
         c.execute('INSERT INTO portal_settings(setting_key, setting_value, updated_by, updated_at) VALUES(?,?,?,?)',
-                  ('student_results_active', 'active', 'System', datetime.now().strftime('%Y-%m-%d %H:%M')))
+                  ('student_results_active', 'active' if DEMO_MODE else 'inactive', 'System', datetime.now().strftime('%Y-%m-%d %H:%M')))
 
     c.execute('''CREATE TABLE IF NOT EXISTS results (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -413,31 +523,32 @@ def init_db():
         ('hod_language', 'language123', 'hod_language', 'HOD Language', 'Head of Department', 'language', 'Coordinates English, local languages, literacy and communication skills.'),
         ('student1', 'student123', 'student', 'Sample Learner One', 'Pupil', None, 'Pupil portal account for viewing Test 1, Test 2 and End Term results.'),
         ('student2', 'student123', 'student', 'Sample Learner Two', 'Pupil', None, 'Pupil portal account for viewing Test 1, Test 2 and End Term results.'),
-    ]
+    ] if DEMO_MODE else []
     for u in users:
         if not c.execute('SELECT id FROM users WHERE username=?', (u[0],)).fetchone():
             c.execute('''INSERT INTO users(username,password,role,full_name,position,department,bio,email,phone,qualification,address,student_number)
                          VALUES(?,?,?,?,?,?,?,?,?,?,?,?)''',
                       (u[0], generate_password_hash(u[1]), u[2], u[3], u[4], u[5], u[6], f'{u[0]}@kafubublock.edu.zm', '+260 XXX XXX XXX', '', '', 'KBSS-001' if u[0]=='student1' else ('KBSS-002' if u[0]=='student2' else None)))
-    c.execute("UPDATE users SET full_name=?, position=?, bio=? WHERE username=?",
-              ('Subject Teacher', 'Subject Teacher', 'Subject teacher account for downloading departmental materials, entering learner results and accessing official documents.', 'teacher'))
-    # Password recovery is restricted to this official Google/Gmail address only.
-    c.execute('UPDATE users SET email=? WHERE username IN (?,?)', (RECOVERY_ALLOWED_EMAIL, 'head', 'hr'))
-    c.execute('UPDATE users SET student_number=? WHERE username=? AND (student_number IS NULL OR student_number="")', ('KBSS-001', 'student1'))
-    c.execute('UPDATE users SET student_number=? WHERE username=? AND (student_number IS NULL OR student_number="")', ('KBSS-002', 'student2'))
+    if DEMO_MODE:
+        c.execute("UPDATE users SET full_name=?, position=?, bio=? WHERE username=?",
+                  ('Subject Teacher', 'Subject Teacher', 'Subject teacher account for downloading departmental materials, entering learner results and accessing official documents.', 'teacher'))
+        c.execute('UPDATE users SET student_number=? WHERE username=? AND (student_number IS NULL OR student_number="")', ('KBSS-001', 'student1'))
+        c.execute('UPDATE users SET student_number=? WHERE username=? AND (student_number IS NULL OR student_number="")', ('KBSS-002', 'student2'))
+    if RECOVERY_ALLOWED_EMAIL:
+        c.execute('UPDATE users SET email=? WHERE username IN (?,?)', (RECOVERY_ALLOWED_EMAIL, 'head', 'hr'))
 
     sample_students = [
         ('KBSS-001', 'Sample Learner One', 'Form 1', '1A', 'Female', '+260 XXX XXX XXX', 'Mr/Ms Class Teacher 1A'),
         ('KBSS-002', 'Sample Learner Two', 'Form 2', '2A', 'Male', '+260 XXX XXX XXX', 'Mr/Ms Class Teacher 2A'),
         ('KBSS-003', 'Sample Learner Three', 'Form 3', '3A', 'Female', '+260 XXX XXX XXX', 'Mr/Ms Class Teacher 3A'),
-    ]
+    ] if DEMO_MODE else []
     for st in sample_students:
         if not c.execute('SELECT id FROM students WHERE student_number=?', (st[0],)).fetchone():
             c.execute('INSERT INTO students(student_number,full_name,grade,class_name,gender,parent_phone,class_teacher,created_at) VALUES(?,?,?,?,?,?,?,?)', (*st, datetime.now().strftime('%Y-%m-%d %H:%M')))
         else:
             c.execute('UPDATE students SET class_teacher=COALESCE(NULLIF(class_teacher,""), ?) WHERE student_number=?', (st[6], st[0]))
 
-    if not c.execute('SELECT id FROM donor_needs LIMIT 1').fetchone():
+    if DEMO_MODE and not c.execute('SELECT id FROM donor_needs LIMIT 1').fetchone():
         needs = [
             ('Science laboratory equipment','Beakers, test tubes, burners and safety goggles for learner practicals.','Assorted','High','K35,000'),
             ('Computer laboratory computers','Desktop computers or laptops for ICT and Computer Science lessons.','25 computers','High','K180,000'),
@@ -447,10 +558,10 @@ def init_db():
         ]
         for n in needs:
             c.execute('INSERT INTO donor_needs(item,description,quantity,priority,estimated_cost,created_at) VALUES(?,?,?,?,?,?)', (*n, datetime.now().strftime('%Y-%m-%d %H:%M')))
-    if not c.execute('SELECT id FROM guidance_posts LIMIT 1').fetchone():
+    if DEMO_MODE and not c.execute('SELECT id FROM guidance_posts LIMIT 1').fetchone():
         c.execute("""INSERT INTO guidance_posts(title,category,message,video_filename,posted_by,posted_at) VALUES(?,?,?,?,?,?)""",
                   ('Welcome to Guidance and Counselling', 'Learner Support', 'This section will be used to share advice, study skills, discipline guidance, career information and counselling messages for learners.', None, 'Guidance and Counselling Teacher', datetime.now().strftime('%Y-%m-%d %H:%M')))
-    if not c.execute('SELECT id FROM school_calendar LIMIT 1').fetchone():
+    if DEMO_MODE and not c.execute('SELECT id FROM school_calendar LIMIT 1').fetchone():
         calendar_events = [
             ('Opening Day', '2026-01-12', '07:30', '12:30', 'Term Event', 'School Campus', 'All learners and staff', 'Official opening of the school term and orientation for learners.'),
             ('Mid-Term Tests', '2026-02-16', '08:00', '15:30', 'Assessment', 'Classrooms', 'All learners', 'Beginning of mid-term tests. Learners must come prepared with required materials.'),
@@ -460,12 +571,13 @@ def init_db():
         for ev in calendar_events:
             c.execute("""INSERT INTO school_calendar(title,event_date,start_time,end_time,category,venue,audience,description,created_by,created_at)
                          VALUES(?,?,?,?,?,?,?,?,?,?)""", (*ev, 'System', datetime.now().strftime('%Y-%m-%d %H:%M')))
+    harden_production_accounts(c)
     conn.commit(); conn.close()
 
 
 @app.context_processor
 def inject_globals():
-    return dict(DEPARTMENTS=DEPARTMENTS, TERMS=TERMS, GRADES=GRADES, FULL_ACCESS_ROLES=FULL_ACCESS_ROLES, STAFF_MANAGEMENT_FULL_ROLES=STAFF_MANAGEMENT_FULL_ROLES, LEADERSHIP_ROLES=LEADERSHIP_ROLES, STAFF_ROLES=STAFF_ROLES, GUIDANCE_ROLES=GUIDANCE_ROLES, PORTAL_CONTROL_ROLES=PORTAL_CONTROL_ROLES, session=session, student_results_active=is_student_results_active(), active_backgrounds=get_active_backgrounds(), BACKGROUND_MANAGEMENT_ROLES=BACKGROUND_MANAGEMENT_ROLES, CALENDAR_MANAGEMENT_ROLES=CALENDAR_MANAGEMENT_ROLES, website_content=get_website_content())
+    return dict(DEPARTMENTS=DEPARTMENTS, TERMS=TERMS, GRADES=GRADES, FULL_ACCESS_ROLES=FULL_ACCESS_ROLES, STAFF_MANAGEMENT_FULL_ROLES=STAFF_MANAGEMENT_FULL_ROLES, LEADERSHIP_ROLES=LEADERSHIP_ROLES, STAFF_ROLES=STAFF_ROLES, GUIDANCE_ROLES=GUIDANCE_ROLES, PORTAL_CONTROL_ROLES=PORTAL_CONTROL_ROLES, session=session, student_results_active=is_student_results_active(), active_backgrounds=get_active_backgrounds(), BACKGROUND_MANAGEMENT_ROLES=BACKGROUND_MANAGEMENT_ROLES, CALENDAR_MANAGEMENT_ROLES=CALENDAR_MANAGEMENT_ROLES, website_content=get_website_content(), MAX_GUIDANCE_VIDEO_MB=MAX_GUIDANCE_VIDEO_MB)
 
 
 
@@ -522,7 +634,8 @@ def get_website_content():
 
 
 def get_client_ip():
-    return request.headers.get('X-Forwarded-For', request.remote_addr or '').split(',')[0].strip()
+    # ProxyFix supplies the correct address only when TRUST_PROXY=1.
+    return request.remote_addr or ''
 
 
 def log_security_event(event_type, username=None, role=None, details=''):
@@ -548,6 +661,19 @@ def unique_safe_filename(original_name):
     return datetime.now().strftime('%Y%m%d%H%M%S_%f_') + safe
 
 
+def uploaded_file_within_limit(file, maximum_bytes):
+    current_position = file.stream.tell()
+    file.stream.seek(0, os.SEEK_END)
+    size = file.stream.tell()
+    file.stream.seek(current_position)
+    return size <= maximum_bytes
+
+
+def generate_temporary_password():
+    # Easy to type, while still containing uppercase, lowercase and numbers.
+    return f"Kb{secrets.randbelow(900000) + 100000}{secrets.choice('ABCDEFGHJKLMNPQRSTUVWXYZ')}{secrets.choice('abcdefghijkmnopqrstuvwxyz')}"
+
+
 def password_is_strong(password):
     if len(password) < 8:
         return False, 'Password must have at least 8 characters.'
@@ -558,6 +684,17 @@ def password_is_strong(password):
     if not any(ch.isdigit() for ch in password):
         return False, 'Password must include at least one number.'
     return True, ''
+
+
+def get_csrf_token():
+    token = session.get('_csrf_token')
+    if not token:
+        token = secrets.token_urlsafe(32)
+        session['_csrf_token'] = token
+    return token
+
+
+app.jinja_env.globals['csrf_token'] = get_csrf_token
 
 
 def too_many_login_attempts(username):
@@ -578,9 +715,26 @@ def record_login_attempt(username, success):
 
 
 @app.before_request
+def validate_csrf():
+    if request.method in {'POST', 'PUT', 'PATCH', 'DELETE'}:
+        expected = session.get('_csrf_token', '')
+        supplied = request.form.get('_csrf_token', '') or request.headers.get('X-CSRF-Token', '')
+        if not expected or not supplied or not secrets.compare_digest(expected, supplied):
+            abort(400, description='The form expired or could not be verified. Go back, refresh the page and try again.')
+
+
+@app.before_request
 def secure_session_refresh():
     if 'user_id' in session:
         session.permanent = True
+
+
+@app.before_request
+def enforce_required_password_change():
+    allowed = {'change_password', 'logout', 'static', 'profile_picture', 'background_picture'}
+    if session.get('user_id') and session.get('must_change_password') and request.endpoint not in allowed:
+        flash('For security, create your own password before using the portal.', 'warning')
+        return redirect(url_for('change_password'))
 
 
 @app.after_request
@@ -591,7 +745,21 @@ def set_security_headers(response):
     response.headers['Permissions-Policy'] = 'camera=(), microphone=(), geolocation=()'
     # Keep this CSP practical for the school app because it uses inline styles/scripts and embedded Google Maps.
     response.headers['Content-Security-Policy'] = "default-src 'self'; img-src 'self' data:; media-src 'self'; frame-src https://www.google.com https://maps.google.com; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline';"
+    if IS_PRODUCTION:
+        response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+    if session.get('user_id'):
+        response.headers['Cache-Control'] = 'no-store, private'
     return response
+
+
+@app.errorhandler(400)
+def bad_request(error):
+    return render_template('error.html', title='Form expired', message=getattr(error, 'description', 'The request could not be verified.')), 400
+
+
+@app.errorhandler(RequestEntityTooLarge)
+def upload_too_large(error):
+    return render_template('error.html', title='File too large', message=f'The maximum request size is {MAX_UPLOAD_MB} MB.'), 413
 
 
 def can_manage_backgrounds():
@@ -637,6 +805,42 @@ def refresh_session_user(user_id):
         session['full_name'] = user['full_name']; session['department'] = user['department']; session['role'] = user['role']
 
 
+def establish_user_session(user, profile_first=False):
+    session.clear()
+    session.permanent = True
+    session['user_id'] = user['id']
+    session['username'] = user['username']
+    session['role'] = user['role']
+    session['full_name'] = user['full_name']
+    session['department'] = user['department']
+    session['must_change_password'] = bool(user['must_change_password'])
+    if profile_first:
+        session['post_password_change_endpoint'] = 'profile'
+
+
+def sync_staff_return_profile(conn, user_id, full_name, phone, email, address, position, department, qualification, subjects_taught='', updated_at=None):
+    """Keep the staff-return identity record aligned with the live staff profile."""
+    timestamp = updated_at or datetime.now().strftime('%Y-%m-%d %H:%M')
+    conn.execute('''INSERT INTO staff_returns(
+        user_id, full_name, phone, email, address, position, department,
+        subjects_taught, highest_qualification, submitted_at, updated_at
+    ) VALUES(?,?,?,?,?,?,?,?,?,?,?)
+    ON CONFLICT(user_id) DO UPDATE SET
+        full_name=excluded.full_name,
+        phone=excluded.phone,
+        email=excluded.email,
+        address=excluded.address,
+        position=excluded.position,
+        department=excluded.department,
+        subjects_taught=CASE WHEN excluded.subjects_taught!='' THEN excluded.subjects_taught ELSE staff_returns.subjects_taught END,
+        highest_qualification=excluded.highest_qualification,
+        updated_at=excluded.updated_at''', (
+        user_id, full_name, phone, email, address, position,
+        DEPARTMENTS.get(department, department or ''), subjects_taught,
+        qualification, timestamp, timestamp
+    ))
+
+
 def calc_result(test1, test2, end_term):
     total = float(test1 or 0) + float(test2 or 0) + float(end_term or 0)
     average = total / 3 if total else 0
@@ -656,10 +860,10 @@ def log_password_action(conn, target_user, action, note=''):
 
 
 def send_reset_email_or_save(conn, user, reset_link):
-    """Send password recovery link by email if SMTP is configured, otherwise save it in an outbox for demo/local use."""
+    """Send recovery by SMTP; only demo mode may display/store a usable reset link."""
     email = (user['email'] or '').strip()
-    status = 'Saved for demo'
-    details = 'SMTP not configured. Link saved in Headteacher/HR reset email outbox.'
+    status = 'Not sent'
+    details = 'SMTP is not configured. No usable reset link was stored in production.'
     sent_at = None
 
     smtp_host = os.environ.get('SMTP_HOST', '').strip()
@@ -690,12 +894,13 @@ def send_reset_email_or_save(conn, user, reset_link):
             details = 'Reset email sent successfully.'
             sent_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         except Exception as exc:
-            status = 'Saved after email error'
-            details = f'Email sending failed: {str(exc)[:300]}. Link saved in outbox.'
+            status = 'Email error'
+            details = f'Email sending failed: {str(exc)[:300]}. No usable link was stored in production.'
 
+    stored_link = reset_link if (status == 'Sent' or DEMO_MODE) else '[not stored]'
     conn.execute('''INSERT INTO password_reset_email_outbox(user_id, username, email, reset_link, status, created_at, sent_at, details)
                     VALUES(?,?,?,?,?,?,?,?)''',
-                 (user['id'], user['username'], email, reset_link, status,
+                 (user['id'], user['username'], email, stored_link, status,
                   datetime.now().strftime('%Y-%m-%d %H:%M:%S'), sent_at, details))
     return status
 
@@ -742,6 +947,124 @@ def user_can_manage_staff(target_user):
     return False
 
 
+def create_backup_archive(kind='manual'):
+    """Create a consistent SQLite snapshot plus uploaded files."""
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_%f')
+    filename = f'{kind}_kafubu_backup_{timestamp}.zip'
+    final_path = os.path.join(BACKUP_DIR, filename)
+    with tempfile.TemporaryDirectory(dir=BACKUP_DIR) as temp_dir:
+        snapshot_path = os.path.join(temp_dir, 'school.db')
+        source = sqlite3.connect(DB_PATH)
+        destination = sqlite3.connect(snapshot_path)
+        try:
+            source.backup(destination)
+        finally:
+            destination.close()
+            source.close()
+
+        manifest = {
+            'application': 'Kafubu Block Secondary School Portal',
+            'backup_version': 1,
+            'created_at': datetime.now().isoformat(timespec='seconds'),
+            'kind': kind,
+        }
+        temporary_zip = os.path.join(temp_dir, filename)
+        with zipfile.ZipFile(temporary_zip, 'w', compression=zipfile.ZIP_DEFLATED) as archive:
+            archive.write(snapshot_path, 'school.db')
+            archive.writestr('manifest.json', json.dumps(manifest, indent=2))
+            for root, _, files in os.walk(UPLOAD_ROOT):
+                for upload_name in files:
+                    full_path = os.path.join(root, upload_name)
+                    archive.write(full_path, os.path.join('uploads', os.path.relpath(full_path, UPLOAD_ROOT)))
+        os.replace(temporary_zip, final_path)
+    return filename
+
+
+def list_backup_archives():
+    backups = []
+    for filename in os.listdir(BACKUP_DIR):
+        if not filename.endswith('.zip') or not filename.startswith(('manual_', 'auto_', 'before_restore_')):
+            continue
+        path = os.path.join(BACKUP_DIR, filename)
+        if os.path.isfile(path):
+            stat = os.stat(path)
+            backups.append({
+                'filename': filename,
+                'created_at': datetime.fromtimestamp(stat.st_mtime).strftime('%Y-%m-%d %H:%M:%S'),
+                'size_mb': round(stat.st_size / (1024 * 1024), 2),
+            })
+    return sorted(backups, key=lambda item: item['filename'], reverse=True)
+
+
+def prune_automatic_backups():
+    automatic = [b for b in list_backup_archives() if b['filename'].startswith('auto_')]
+    for old in automatic[BACKUP_RETENTION:]:
+        os.remove(os.path.join(BACKUP_DIR, old['filename']))
+
+
+def maybe_create_automatic_backup():
+    if not AUTO_BACKUP_ENABLED or not os.path.exists(DB_PATH):
+        return
+    automatic = [b for b in list_backup_archives() if b['filename'].startswith('auto_')]
+    if automatic:
+        newest = os.path.join(BACKUP_DIR, automatic[0]['filename'])
+        age_hours = (datetime.now().timestamp() - os.path.getmtime(newest)) / 3600
+        if age_hours < AUTO_BACKUP_HOURS:
+            return
+    lock_path = os.path.join(BACKUP_DIR, '.automatic_backup.lock')
+    try:
+        lock_fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+    except FileExistsError:
+        return
+    try:
+        os.close(lock_fd)
+        create_backup_archive('auto')
+        prune_automatic_backups()
+    finally:
+        if os.path.exists(lock_path):
+            os.remove(lock_path)
+
+
+def restore_backup_archive(filename):
+    safe_name = os.path.basename(filename)
+    if safe_name != filename:
+        raise ValueError('Invalid backup filename.')
+    backup_path = os.path.join(BACKUP_DIR, safe_name)
+    if not os.path.isfile(backup_path):
+        raise ValueError('Backup file was not found.')
+
+    create_backup_archive('before_restore')
+    with tempfile.TemporaryDirectory(dir=BACKUP_DIR) as temp_dir:
+        with zipfile.ZipFile(backup_path, 'r') as archive:
+            names = archive.namelist()
+            if 'school.db' not in names or 'manifest.json' not in names:
+                raise ValueError('This is not a valid school portal backup.')
+            restored_db = os.path.join(temp_dir, 'school.db')
+            with archive.open('school.db') as source, open(restored_db, 'wb') as target:
+                shutil.copyfileobj(source, target)
+            check = sqlite3.connect(restored_db)
+            try:
+                integrity = check.execute('PRAGMA integrity_check').fetchone()[0]
+            finally:
+                check.close()
+            if integrity != 'ok':
+                raise ValueError('The backup database failed its integrity check.')
+
+            os.replace(restored_db, DB_PATH)
+            for member in archive.infolist():
+                normalized = member.filename.replace('\\', '/')
+                if member.is_dir() or not normalized.startswith('uploads/') or '..' in normalized.split('/'):
+                    continue
+                relative_upload = normalized[len('uploads/'):]
+                target_path = os.path.abspath(os.path.join(UPLOAD_ROOT, relative_upload))
+                if not target_path.startswith(os.path.abspath(UPLOAD_ROOT) + os.sep):
+                    continue
+                os.makedirs(os.path.dirname(target_path), exist_ok=True)
+                with archive.open(member) as source, open(target_path, 'wb') as target:
+                    shutil.copyfileobj(source, target)
+    init_db()
+
+
 
 @app.route('/')
 def index():
@@ -762,12 +1085,12 @@ def department_detail(dept):
         return redirect(url_for('departments'))
     conn = get_db()
     materials = conn.execute('SELECT * FROM materials WHERE department=? ORDER BY uploaded_at DESC LIMIT 5', (dept,)).fetchall()
-    hod = conn.execute('SELECT * FROM users WHERE department=? AND role LIKE "hod_%" LIMIT 1', (dept,)).fetchone()
+    hod = conn.execute('SELECT * FROM users WHERE department=? AND role LIKE "hod_%" AND is_active=1 LIMIT 1', (dept,)).fetchone()
     teachers = conn.execute('''SELECT * FROM users
-                               WHERE department=? AND role NOT IN ('student')
-                               ORDER BY CASE WHEN role LIKE 'hod_%' THEN 1 WHEN role='teacher' THEN 2 ELSE 3 END, full_name''', (dept,)).fetchall()
+                               WHERE department=? AND role='teacher' AND is_active=1
+                               ORDER BY full_name''', (dept,)).fetchall()
     conn.close()
-    return render_template('department_detail.html', dept=dept, materials=materials, hod=hod, teachers=teachers)
+    return render_template('department_detail.html', dept=dept, materials=materials, hod=hod, teachers=teachers, teacher_count=len(teachers))
 @app.route('/leadership')
 def leadership():
     conn=get_db(); leaders=conn.execute("SELECT * FROM users WHERE role IN ('headteacher','deputy_headteacher','hr') OR role LIKE 'hod_%' ORDER BY role").fetchall(); conn.close()
@@ -856,22 +1179,44 @@ def login():
         conn = get_db()
         user = conn.execute('SELECT * FROM users WHERE username=?', (username,)).fetchone()
         conn.close()
-        if user and check_password_hash(user['password'], password):
+        if user and user['is_active'] and check_password_hash(user['password'], password):
             record_login_attempt(username, True)
-            session.clear()
-            session.permanent = True
-            session['user_id'] = user['id']
-            session['username'] = user['username']
-            session['role'] = user['role']
-            session['full_name'] = user['full_name']
-            session['department'] = user['department']
+            establish_user_session(user, profile_first=user['role'] == 'teacher')
             log_security_event('Login successful', username=user['username'], role=user['role'])
             flash(f'Login successful. Welcome to the {user["position"]} portal.', 'success')
-            return redirect(url_for('dashboard'))
+            destination = 'profile' if user['role'] == 'teacher' else 'dashboard'
+            return redirect(url_for('change_password' if user['must_change_password'] else destination))
         record_login_attempt(username, False)
         log_security_event('Failed login', username=username, details='Wrong username or password.')
         flash('Wrong username or password.', 'danger')
     return render_template('login.html')
+
+
+@app.route('/teacher-login', methods=['GET', 'POST'])
+def teacher_login():
+    """Dedicated login for individual Subject Teacher accounts."""
+    if session.get('user_id'):
+        return redirect(url_for('profile' if session.get('role') == 'teacher' else 'dashboard'))
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip().lower()
+        password = request.form.get('password', '')
+        if too_many_login_attempts(username):
+            log_security_event('Blocked teacher login attempt', username=username, details='Too many failed login attempts.')
+            flash(f'Too many wrong login attempts. Try again after {LOGIN_LOCK_MINUTES} minutes or ask the Headteacher/HR to reset the password.', 'danger')
+            return render_template('teacher_login.html')
+        conn = get_db()
+        teacher = conn.execute("SELECT * FROM users WHERE username=? AND role='teacher'", (username,)).fetchone()
+        conn.close()
+        if teacher and teacher['is_active'] and check_password_hash(teacher['password'], password):
+            record_login_attempt(username, True)
+            establish_user_session(teacher, profile_first=True)
+            log_security_event('Teacher portal login successful', username=teacher['username'], role=teacher['role'])
+            flash(f'Welcome, {teacher["full_name"]}. You can view and update your profile here.', 'success')
+            return redirect(url_for('change_password' if teacher['must_change_password'] else 'profile'))
+        record_login_attempt(username, False)
+        log_security_event('Failed teacher portal login', username=username, details='Wrong teacher username or password.')
+        flash('Wrong teacher username or password.', 'danger')
+    return render_template('teacher_login.html')
 
 
 @app.route('/forgot-management-password', methods=['GET','POST'])
@@ -885,7 +1230,7 @@ def forgot_management_password():
         username = request.form.get('username','').strip().lower()
         # Always use a generic public response so attackers cannot confirm valid accounts.
         generic_message = 'If the username and authorised email are correct, a secure reset link will be prepared.'
-        if email != RECOVERY_ALLOWED_EMAIL or not username:
+        if not RECOVERY_ALLOWED_EMAIL or email != RECOVERY_ALLOWED_EMAIL or not username:
             log_security_event('Password recovery blocked', username=username or email, details='Unauthorised email or missing username.')
             flash(generic_message, 'info')
             return render_template('forgot_management_password.html', reset_link=None)
@@ -906,29 +1251,36 @@ def forgot_management_password():
         conn.execute("UPDATE password_reset_tokens SET used='Yes', used_at=? WHERE user_id=? AND used='No'",
                      (datetime.now().strftime('%Y-%m-%d %H:%M:%S'), user['id']))
         token = secrets.token_urlsafe(64)
+        token_hash = hashlib.sha256(token.encode('utf-8')).hexdigest()
         expires_at = (datetime.now() + timedelta(minutes=15)).strftime('%Y-%m-%d %H:%M:%S')
         created_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         conn.execute('''INSERT INTO password_reset_tokens(user_id, email, token, role, expires_at, used, created_at)
                         VALUES(?,?,?,?,?,'No',?)''',
-                     (user['id'], RECOVERY_ALLOWED_EMAIL, token, user['role'], expires_at, created_at))
+                     (user['id'], RECOVERY_ALLOWED_EMAIL, token_hash, user['role'], expires_at, created_at))
         reset_link = url_for('reset_management_password', token=token, _external=True)
-        send_reset_email_or_save(conn, user, reset_link)
+        delivery_status = send_reset_email_or_save(conn, user, reset_link)
         log_password_action(conn, user, 'Secure password recovery link requested', 'Recovery allowed only through the authorised Google/Gmail email.')
         conn.commit(); conn.close()
         log_security_event('Secure password recovery link prepared', username=user['username'], role=user['role'])
-        flash('Secure reset link prepared. Check the authorised Google/Gmail email. In local demo mode, the link is shown below.', 'success')
-        return render_template('forgot_management_password.html', reset_link=reset_link)
+        if delivery_status == 'Sent':
+            flash('A secure password reset link was sent to the authorised management email.', 'success')
+        elif DEMO_MODE:
+            flash('Demo mode: the reset link is shown below.', 'success')
+        else:
+            flash('Email delivery is not configured. Ask the hosting administrator to configure SMTP.', 'warning')
+        return render_template('forgot_management_password.html', reset_link=reset_link if DEMO_MODE else None)
     return render_template('forgot_management_password.html', reset_link=reset_link)
 
 
 @app.route('/reset-management-password/<token>', methods=['GET','POST'])
 def reset_management_password(token):
     conn = get_db()
+    token_hash = hashlib.sha256(token.encode('utf-8')).hexdigest()
     token_row = conn.execute('''SELECT prt.*, u.username, u.full_name, u.password, u.role
                                 FROM password_reset_tokens prt
                                 JOIN users u ON u.id = prt.user_id
                                 WHERE prt.token=? AND prt.used='No'
-                                LIMIT 1''', (token,)).fetchone()
+                                LIMIT 1''', (token_hash,)).fetchone()
     if not token_row:
         conn.close(); flash('Invalid or already used password reset link.', 'danger'); return redirect(url_for('login'))
     if datetime.strptime(token_row['expires_at'], '%Y-%m-%d %H:%M:%S') < datetime.now():
@@ -944,7 +1296,7 @@ def reset_management_password(token):
         ok, msg = password_is_strong(new_password)
         if not ok:
             conn.close(); flash(msg, 'warning'); return redirect(request.url)
-        conn.execute('UPDATE users SET password=? WHERE id=?', (generate_password_hash(new_password), token_row['user_id']))
+        conn.execute('UPDATE users SET password=?, must_change_password=0, is_active=1 WHERE id=?', (generate_password_hash(new_password), token_row['user_id']))
         conn.execute('UPDATE password_reset_tokens SET used=?, used_at=? WHERE id=?',
                      ('Yes', datetime.now().strftime('%Y-%m-%d %H:%M:%S'), token_row['id']))
         target = conn.execute('SELECT * FROM users WHERE id=?', (token_row['user_id'],)).fetchone()
@@ -970,9 +1322,7 @@ def password_reset_email_outbox():
 @app.route('/teacher-register', methods=['GET','POST'])
 @login_required
 def teacher_register():
-    """HOD registration for new subject teachers.
-    The form now includes a department dropdown so the registering HOD can choose the department to record the Subject Teacher under.
-    """
+    """Create a teacher account automatically assigned to the registering HOD's department."""
     if not session.get('role','').startswith('hod_'):
         flash('Only HODs can register new Subject Teachers.', 'danger')
         return redirect(url_for('dashboard'))
@@ -982,7 +1332,8 @@ def teacher_register():
         password = request.form.get('password','')
         confirm_password = request.form.get('confirm_password','')
         full_name = request.form.get('full_name','').strip()
-        department = request.form.get('department','').strip() or hod_department
+        # Never trust a submitted department: the HOD's role controls the assignment.
+        department = hod_department
         phone = request.form.get('phone','').strip()
         email = request.form.get('email','').strip()
         qualification = request.form.get('qualification','').strip()
@@ -1016,26 +1367,66 @@ def teacher_register():
                 conn.close()
                 flash('Only JPG, PNG, GIF or WEBP profile pictures are allowed.', 'danger')
                 return render_template('teacher_register.html', hod_department=hod_department, selected_department=department)
+            if not uploaded_file_within_limit(file, MAX_IMAGE_BYTES):
+                conn.close()
+                flash(f'Profile pictures must be {MAX_IMAGE_MB} MB or less.', 'danger')
+                return render_template('teacher_register.html', hod_department=hod_department, selected_department=department)
             filename = unique_safe_filename(file.filename)
             file.save(os.path.join(PROFILE_DIR, filename))
         now = datetime.now().strftime('%Y-%m-%d %H:%M')
-        cur = conn.execute("""INSERT INTO users(username,password,role,full_name,position,department,bio,email,phone,qualification,address,profile_picture)
-                              VALUES(?,?,?,?,?,?,?,?,?,?,?,?)""",
-                           (username, generate_password_hash(password), 'teacher', full_name, position, department, bio, email, phone, qualification, address, filename))
+        cur = conn.execute("""INSERT INTO users(username,password,role,full_name,position,department,bio,email,phone,qualification,address,profile_picture,must_change_password,is_active,profile_updated_at)
+                              VALUES(?,?,?,?,?,?,?,?,?,?,?,?,1,1,?)""",
+                           (username, generate_password_hash(password), 'teacher', full_name, position, department, bio, email, phone, qualification, address, filename, now))
         new_user_id = cur.lastrowid
-        conn.execute("""INSERT INTO staff_returns(user_id, full_name, phone, email, address, position, department, subjects_taught, highest_qualification, submitted_at, updated_at)
-                        VALUES(?,?,?,?,?,?,?,?,?,?,?)""",
-                     (new_user_id, full_name, phone, email, address, position, DEPARTMENTS.get(department, department), subjects_taught, qualification, now, now))
+        sync_staff_return_profile(conn, new_user_id, full_name, phone, email, address, position, department, qualification, subjects_taught, now)
         conn.commit(); conn.close()
         log_security_event('New subject teacher registered', username=username, role='teacher', details=f'Department: {DEPARTMENTS.get(department, department)}')
-        flash('Subject Teacher account created successfully. You can now login and edit your profile using the password you created.', 'success')
-        return redirect(url_for('login'))
+        log_security_event('New subject teacher credentials issued', username=username, role='teacher', details='Temporary password created by HOD; private password required at first login.')
+        return render_template(
+            'teacher_registration_complete.html', teacher_name=full_name,
+            teacher_username=username, temporary_password=password,
+            department_name=DEPARTMENTS.get(department, department), department_key=department
+        )
     return render_template('teacher_register.html', hod_department=hod_department, selected_department=hod_department)
 
 @app.route('/logout')
 def logout():
     log_security_event('Logout')
     session.clear(); flash('You have logged out.','info'); return redirect(url_for('index'))
+
+@app.route('/change-password', methods=['GET', 'POST'])
+@login_required
+def change_password():
+    conn = get_db()
+    user = conn.execute('SELECT * FROM users WHERE id=?', (session['user_id'],)).fetchone()
+    if not user:
+        conn.close(); session.clear(); return redirect(url_for('login'))
+    if request.method == 'POST':
+        current_password = request.form.get('current_password', '')
+        new_password = request.form.get('new_password', '').strip()
+        confirm_password = request.form.get('confirm_password', '').strip()
+        if not check_password_hash(user['password'], current_password):
+            conn.close(); flash('Current or temporary password is incorrect.', 'danger'); return redirect(url_for('change_password'))
+        if new_password != confirm_password:
+            conn.close(); flash('New password and confirmation do not match.', 'danger'); return redirect(url_for('change_password'))
+        ok, message = password_is_strong(new_password)
+        if not ok:
+            conn.close(); flash(message, 'warning'); return redirect(url_for('change_password'))
+        if check_password_hash(user['password'], new_password):
+            conn.close(); flash('Choose a password different from the current password.', 'warning'); return redirect(url_for('change_password'))
+        conn.execute('UPDATE users SET password=?, must_change_password=0, is_active=1 WHERE id=?',
+                     (generate_password_hash(new_password), user['id']))
+        log_password_action(conn, user, 'Self password change', 'User created a private portal password.')
+        conn.commit(); conn.close()
+        session['must_change_password'] = False
+        log_security_event('Required password change completed', username=user['username'], role=user['role'])
+        flash('Your new private password has been saved.', 'success')
+        destination = session.pop('post_password_change_endpoint', 'dashboard')
+        if destination not in {'dashboard', 'profile'}:
+            destination = 'dashboard'
+        return redirect(url_for(destination))
+    conn.close()
+    return render_template('change_password.html', forced=bool(session.get('must_change_password')))
 
 @app.route('/dashboard')
 @login_required
@@ -1080,9 +1471,11 @@ def profile():
         new_password = request.form.get('new_password', '')
         confirm_password = request.form.get('confirm_password', '')
         password_blocked_roles = ['teacher', 'guidance_counselling']
-        # HOD department is controlled by their role. Subject teachers may choose the department where they belong.
+        # HOD and Subject Teacher departments are controlled by management assignment.
         if user['role'] in ROLE_TO_DEPT:
             department = ROLE_TO_DEPT[user['role']]
+        elif user['role'] == 'teacher':
+            department = user['department']
         elif user['role'] == 'student':
             department = user['department']
         else:
@@ -1094,6 +1487,8 @@ def profile():
         if file and file.filename:
             if not is_allowed_file(file.filename, ALLOWED_IMAGE_EXTENSIONS):
                 conn.close(); flash('Only JPG, PNG, GIF or WEBP profile pictures are allowed.', 'danger'); return redirect(url_for('profile'))
+            if not uploaded_file_within_limit(file, MAX_IMAGE_BYTES):
+                conn.close(); flash(f'Profile pictures must be {MAX_IMAGE_MB} MB or less.', 'danger'); return redirect(url_for('profile'))
             filename = unique_safe_filename(file.filename)
             file.save(os.path.join(PROFILE_DIR, filename))
         if user['role'] in password_blocked_roles and (new_password or confirm_password or current_password):
@@ -1108,21 +1503,25 @@ def profile():
             ok, msg = password_is_strong(new_password)
             if not ok:
                 conn.close(); flash(msg, 'warning'); return redirect(url_for('profile'))
-            conn.execute('UPDATE users SET password=? WHERE id=?', (generate_password_hash(new_password), session['user_id']))
+            conn.execute('UPDATE users SET password=?, must_change_password=0 WHERE id=?', (generate_password_hash(new_password), session['user_id']))
+            session['must_change_password'] = False
             log_password_action(conn, user, 'Self password change', 'User changed own portal password from My Profile.')
         elif user['role'] == 'student' and (new_password or confirm_password or current_password):
             flash('Pupil password changing has been disabled by the school portal.', 'warning')
-        conn.execute('''UPDATE users SET full_name=?, position=?, department=?, phone=?, email=?, bio=?, address=?, qualification=?, profile_picture=? WHERE id=?''',
-                     (full_name, position, department, phone, email, bio, address, qualification, filename, session['user_id']))
+        profile_updated_at = datetime.now().strftime('%Y-%m-%d %H:%M')
+        conn.execute('''UPDATE users SET full_name=?, position=?, department=?, phone=?, email=?, bio=?, address=?, qualification=?, profile_picture=?, profile_updated_at=? WHERE id=?''',
+                     (full_name, position, department, phone, email, bio, address, qualification, filename, profile_updated_at, session['user_id']))
+        sync_staff_return_profile(conn, session['user_id'], full_name, phone, email, address, position, department, qualification, updated_at=profile_updated_at)
         conn.commit(); conn.close(); refresh_session_user(session['user_id'])
         if user['role'] == 'student':
             flash('Profile updated successfully. Password changing is disabled for students.','success')
         else:
             
             if user['role'] in password_blocked_roles:
-                flash('Profile updated successfully. Portal password changing is disabled for Subject Teachers.','success')
+                flash(f'Profile updated successfully. Your details are now updated under {DEPARTMENTS.get(department, "your department")}.','success')
             else:
                 flash('Profile and portal password settings updated successfully.','success')
+        log_security_event('Staff profile and department record updated', details=f'Department: {DEPARTMENTS.get(department, department or "Not assigned")}')
         return redirect(url_for('profile'))
     conn.close(); return render_template('profile.html', user=user)
 
@@ -1157,6 +1556,8 @@ def upload_material():
         
         if not is_allowed_file(file.filename, ALLOWED_DOCUMENT_EXTENSIONS):
             flash('This material file type is not allowed. Upload PDF, Word, Excel, PowerPoint, TXT or CSV only.','danger'); return redirect(url_for('upload_material'))
+        if not uploaded_file_within_limit(file, MAX_DOCUMENT_BYTES):
+            flash(f'Department materials must be {MAX_DOCUMENT_MB} MB or less.','danger'); return redirect(url_for('upload_material'))
         filename=unique_safe_filename(file.filename); file.save(os.path.join(MATERIAL_DIR, filename)); conn=get_db(); conn.execute('INSERT INTO materials(title,description,department,filename,uploaded_by,uploaded_at) VALUES(?,?,?,?,?,?)',(title,description,department,filename,session['full_name'],datetime.now().strftime('%Y-%m-%d %H:%M'))); conn.commit(); conn.close(); flash('Material uploaded successfully.','success'); return redirect(url_for('materials', dept=department))
     return render_template('upload_material.html', allowed_dept=allowed_dept)
 @app.route('/official-documents')
@@ -1173,6 +1574,8 @@ def upload_document():
         
         if not is_allowed_file(file.filename, ALLOWED_DOCUMENT_EXTENSIONS):
             flash('This official document file type is not allowed. Upload PDF, Word, Excel, PowerPoint, TXT or CSV only.','danger'); return redirect(url_for('upload_document'))
+        if not uploaded_file_within_limit(file, MAX_DOCUMENT_BYTES):
+            flash(f'Official documents must be {MAX_DOCUMENT_MB} MB or less.','danger'); return redirect(url_for('upload_document'))
         filename=unique_safe_filename(file.filename); file.save(os.path.join(DOCUMENT_DIR, filename)); conn=get_db(); conn.execute('INSERT INTO documents(title,description,category,filename,uploaded_by,uploaded_at) VALUES(?,?,?,?,?,?)',(title,description,category,filename,session['full_name'],datetime.now().strftime('%Y-%m-%d %H:%M'))); conn.commit(); conn.close(); flash('Official document uploaded successfully.','success'); return redirect(url_for('official_documents'))
     return render_template('upload_document.html')
 @app.route('/manage-donor-needs', methods=['GET','POST'])
@@ -1243,9 +1646,10 @@ def students():
     if request.method == 'POST':
         conn=get_db(); student_number=request.form['student_number'].strip(); full_name=request.form['full_name'].strip(); class_teacher=request.form.get('class_teacher','').strip(); conn.execute('INSERT INTO students(student_number,full_name,grade,class_name,gender,parent_phone,class_teacher,created_at) VALUES(?,?,?,?,?,?,?,?)', (student_number, full_name, request.form['grade'], request.form['class_name'], request.form.get('gender',''), request.form.get('parent_phone',''), class_teacher, datetime.now().strftime('%Y-%m-%d %H:%M')));
         username=student_number.lower().replace('-', '')
+        temporary_password = generate_temporary_password()
         if not conn.execute('SELECT id FROM users WHERE username=?', (username,)).fetchone():
-            conn.execute('INSERT INTO users(username,password,role,full_name,position,department,bio,email,phone,student_number) VALUES(?,?,?,?,?,?,?,?,?,?)', (username, generate_password_hash(student_number), 'student', full_name, 'Pupil', None, 'Pupil portal account for viewing academic results.', '', request.form.get('parent_phone',''), student_number))
-        conn.commit(); conn.close(); flash(f'Pupil added successfully. Pupil login is {username} / {student_number}', 'success'); return redirect(url_for('students'))
+            conn.execute('INSERT INTO users(username,password,role,full_name,position,department,bio,email,phone,student_number,must_change_password,is_active) VALUES(?,?,?,?,?,?,?,?,?,?,1,1)', (username, generate_password_hash(temporary_password), 'student', full_name, 'Pupil', None, 'Pupil portal account for viewing academic results.', '', request.form.get('parent_phone',''), student_number))
+        conn.commit(); conn.close(); flash(f'Pupil added. Username: {username}. Temporary password: {temporary_password}. Give it privately to the pupil; it must be changed at first login.', 'success'); return redirect(url_for('students'))
     conn=get_db(); rows=conn.execute('SELECT * FROM students ORDER BY grade, class_name, full_name').fetchall(); conn.close(); return render_template('students.html', students=rows)
 
 @app.route('/delete-student/<int:student_id>', methods=['POST'])
@@ -2072,11 +2476,18 @@ def edit_staff_profile(user_id):
         if file and file.filename:
             if not is_allowed_file(file.filename, ALLOWED_IMAGE_EXTENSIONS):
                 conn.close(); flash('Only JPG, PNG, GIF or WEBP profile pictures are allowed.', 'danger'); return redirect(url_for('profile'))
+            if not uploaded_file_within_limit(file, MAX_IMAGE_BYTES):
+                conn.close(); flash(f'Profile pictures must be {MAX_IMAGE_MB} MB or less.', 'danger'); return redirect(url_for('edit_staff_profile', user_id=user_id))
             filename = unique_safe_filename(file.filename)
             file.save(os.path.join(PROFILE_DIR, filename))
-        conn.execute("""UPDATE users SET full_name=?, position=?, department=?, phone=?, email=?, qualification=?, address=?, bio=?, profile_picture=? WHERE id=?""",
-                     (full_name, position, department, phone, email, qualification, address, bio, filename, user_id))
-        conn.commit(); conn.close(); flash('Staff profile updated successfully.', 'success'); return redirect(url_for('manage_subject_teachers'))
+        profile_updated_at = datetime.now().strftime('%Y-%m-%d %H:%M')
+        conn.execute("""UPDATE users SET full_name=?, position=?, department=?, phone=?, email=?, qualification=?, address=?, bio=?, profile_picture=?, profile_updated_at=? WHERE id=?""",
+                     (full_name, position, department, phone, email, qualification, address, bio, filename, profile_updated_at, user_id))
+        sync_staff_return_profile(conn, user_id, full_name, phone, email, address, position, department, qualification, updated_at=profile_updated_at)
+        conn.commit(); conn.close()
+        log_security_event('Staff profile reassigned or updated', username=target['username'], role=target['role'], details=f'Department: {DEPARTMENTS.get(department, department or "Not assigned")}')
+        flash(f'Staff profile updated and synchronised with {DEPARTMENTS.get(department, "the department record")}.', 'success')
+        return redirect(url_for('manage_subject_teachers'))
     conn.close()
     return render_template('edit_staff_profile.html', staff=target)
 
@@ -2123,15 +2534,14 @@ def upload_guidance_post():
             if ext not in allowed:
                 flash('Please upload a valid video file such as MP4, WEBM, OGG or MOV.', 'warning')
                 return redirect(url_for('upload_guidance_post'))
-            # Guidance and counselling videos are allowed up to 750MB.
-            # This checks the selected file size before saving it.
+            # Hosted uploads use a conservative limit to protect server memory and storage.
             file.seek(0, os.SEEK_END)
             file_size = file.tell()
             file.seek(0)
             if file_size > MAX_GUIDANCE_VIDEO_BYTES:
-                flash('The video is too large. Guidance videos must be 750MB or less.', 'warning')
+                flash(f'The video is too large. Guidance videos must be {MAX_GUIDANCE_VIDEO_MB} MB or less.', 'warning')
                 return redirect(url_for('upload_guidance_post'))
-            video_filename = datetime.now().strftime('%Y%m%d%H%M%S_') + secure_filename(file.filename)
+            video_filename = unique_safe_filename(file.filename)
             file.save(os.path.join(GUIDANCE_VIDEO_DIR, video_filename))
         if not title or not message:
             flash('Title and message are required.', 'warning')
@@ -2291,6 +2701,9 @@ def manage_backgrounds():
             if ext not in allowed:
                 skipped_files.append(file.filename)
                 continue
+            if not uploaded_file_within_limit(file, MAX_IMAGE_BYTES):
+                skipped_files.append(file.filename + f' (larger than {MAX_IMAGE_MB} MB)')
+                continue
             filename = unique_safe_filename(file.filename)
             file.save(os.path.join(BACKGROUND_DIR, filename))
             picture_title = title if len(files) == 1 else f"{title} {index}"
@@ -2356,7 +2769,7 @@ def reset_user_password(user_id):
     ok, msg = password_is_strong(new_password)
     if not ok:
         conn.close(); flash(msg, 'warning'); return redirect(url_for('manage_passwords'))
-    conn.execute('UPDATE users SET password=? WHERE id=?', (generate_password_hash(new_password), user_id))
+    conn.execute('UPDATE users SET password=?, must_change_password=1, is_active=1 WHERE id=?', (generate_password_hash(new_password), user_id))
     log_password_action(conn, target, 'Password reset by management', note or 'Password reset by Headteacher/HR from Manage Passwords.')
     conn.commit(); conn.close()
     flash(f'Password for {target["full_name"]} has been reset successfully. The action has been recorded.', 'success')
@@ -2382,5 +2795,57 @@ def security_audit_records():
     return render_template('security_audit_records.html', records=records)
 
 
+@app.route('/backup-center', methods=['GET', 'POST'])
+@login_required
+@roles_required('headteacher', 'hr')
+def backup_center():
+    if request.method == 'POST':
+        action = request.form.get('action', '')
+        if action == 'create':
+            filename = create_backup_archive('manual')
+            log_security_event('Manual backup created', details=filename)
+            flash('A complete backup was created successfully.', 'success')
+            return redirect(url_for('backup_center'))
+        if action == 'restore':
+            filename = request.form.get('filename', '')
+            confirmation = request.form.get('confirmation', '').strip()
+            current_password = request.form.get('current_password', '')
+            conn = get_db()
+            current_user = conn.execute('SELECT * FROM users WHERE id=?', (session['user_id'],)).fetchone()
+            conn.close()
+            if confirmation != 'RESTORE':
+                flash('Type RESTORE exactly to confirm.', 'warning'); return redirect(url_for('backup_center'))
+            if not current_user or not check_password_hash(current_user['password'], current_password):
+                flash('Your current password is incorrect.', 'danger'); return redirect(url_for('backup_center'))
+            try:
+                restore_backup_archive(filename)
+            except (ValueError, zipfile.BadZipFile, sqlite3.DatabaseError) as exc:
+                log_security_event('Backup restore failed', details=str(exc))
+                flash(f'Backup restore failed: {exc}', 'danger')
+                return redirect(url_for('backup_center'))
+            log_security_event('Backup restored', details=filename)
+            session.clear()
+            flash('Backup restored successfully. Please log in again.', 'success')
+            return redirect(url_for('login'))
+        abort(400, description='Unknown backup action.')
+    return render_template(
+        'backup_center.html', backups=list_backup_archives(),
+        auto_backup_enabled=AUTO_BACKUP_ENABLED, backup_retention=BACKUP_RETENTION
+    )
+
+
+@app.route('/backup-download/<filename>')
+@login_required
+@roles_required('headteacher', 'hr')
+def backup_download(filename):
+    safe_name = os.path.basename(filename)
+    if safe_name != filename or not safe_name.endswith('.zip'):
+        abort(404)
+    return send_from_directory(BACKUP_DIR, safe_name, as_attachment=True)
+
+init_db()
+maybe_create_automatic_backup()
+
+
 if __name__ == '__main__':
-    init_db(); app.run(debug=False)
+    app.run(debug=False)

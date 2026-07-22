@@ -1,0 +1,129 @@
+KAFUBU PORTAL - SAFE UPGRADE ON AN EXISTING RENDER SERVICE
+==========================================================
+
+DO NOT DEPLOY UNTIL THE LIVE DATA IS BACKED UP
+---------------------------------------------
+Preserve these from the current live service:
+- school.db
+- the complete uploads folder
+- current environment-variable names and values
+
+The upgraded ZIP intentionally does not contain those live files.
+
+WHY A PERSISTENT DISK IS REQUIRED
+---------------------------------
+Render's normal service filesystem is temporary. Files outside a persistent
+disk can disappear during a deploy or restart. This app must therefore use:
+
+DATA_DIR=/var/data
+BACKUP_DIR=/var/data/backups
+
+The Render service must have a persistent disk mounted at /var/data. Persistent
+disks are available on paid Render web services. If the service is currently on
+the Free instance type, do not use SQLite for real school records without first
+moving to a service that supports a persistent disk or migrating the app to a
+managed database and object storage.
+
+STEP 1 - CHECK THE EXISTING SERVICE
+-----------------------------------
+In Render Dashboard, open the current web service and record:
+- Connected Git repository and branch
+- Root Directory
+- Build Command
+- Start Command
+- Instance Type
+- Whether a disk is already listed under Disks
+- The existing disk mount path, if any
+
+If a disk already exists at a different mount path, use that path for DATA_DIR
+instead of creating another path. Do not continue until the live database and
+uploads have been copied safely.
+
+STEP 2 - UPDATE THE SOURCE REPOSITORY
+-------------------------------------
+Replace the old application code in the connected Git repository with this
+package, but keep any backed-up data outside Git. The repository root used by
+Render must contain app.py, wsgi.py and requirements.txt. Commit and push the
+change only after the service configuration below is ready.
+
+For an existing service, do not create a new Blueprint unless you deliberately
+want a second service. render.yaml.example is only a reference.
+
+STEP 3 - ADD OR CONFIRM THE PERSISTENT DISK
+-------------------------------------------
+Render Dashboard > your service > Disks:
+- Disk mount path: /var/data
+- Choose enough capacity for school.db, uploads and backups.
+
+Only files saved below /var/data will survive deploys and restarts.
+
+STEP 4 - CONFIGURE THE EXISTING WEB SERVICE
+-------------------------------------------
+Render Dashboard > your service > Settings:
+
+Build Command:
+pip install -r requirements.txt
+
+Start Command:
+gunicorn --workers 1 --threads 4 --timeout 120 --bind 0.0.0.0:$PORT wsgi:app
+
+Health Check Path:
+/
+
+Use only one Gunicorn worker while the application uses SQLite.
+
+STEP 5 - ADD ENVIRONMENT VARIABLES
+----------------------------------
+Render Dashboard > your service > Environment:
+
+APP_ENV=production
+FLASK_SECRET_KEY=<generate a new random value of at least 32 characters>
+INITIAL_ADMIN_PASSWORD=<strong temporary Headteacher password>
+RECOVERY_ALLOWED_EMAIL=<official school recovery email>
+TRUST_PROXY=1
+DATA_DIR=/var/data
+BACKUP_DIR=/var/data/backups
+AUTO_BACKUP_ENABLED=1
+AUTO_BACKUP_HOURS=24
+BACKUP_RETENTION=30
+MAX_UPLOAD_MB=50
+MAX_GUIDANCE_VIDEO_MB=50
+MAX_DOCUMENT_MB=25
+MAX_IMAGE_MB=8
+
+Add SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD and SMTP_FROM if email
+password recovery is required. Never commit secret values to Git.
+
+STEP 6 - PLACE THE LIVE DATA ON THE DISK
+----------------------------------------
+Before opening the upgraded site to users, /var/data must contain:
+
+/var/data/school.db
+/var/data/uploads/materials
+/var/data/uploads/documents
+/var/data/uploads/profile_pics
+/var/data/uploads/guidance_videos
+/var/data/uploads/backgrounds
+
+If the service already uses another persistent disk path, copy the live files
+within Render's Shell or transfer the backup to the correct mount path. Verify
+the file sizes before restarting. Do not overwrite the backup kept on your own
+computer.
+
+STEP 7 - DEPLOY AND VERIFY
+--------------------------
+1. Trigger Manual Deploy > Deploy latest commit.
+2. Watch the Events/Logs page until Gunicorn starts successfully.
+3. Open the public homepage and check the modern design.
+4. Login as Headteacher and create a private password if prompted.
+5. Confirm pupil totals, results, staff records and uploads are present.
+6. Test HOD registration and the separate Teacher Login.
+7. Open Backup and Restore Centre and create a complete backup.
+8. Download that backup to a separate protected computer.
+
+ROLLBACK
+--------
+If the deploy fails, Render normally keeps the last successful deploy running.
+If the new app starts but data is missing, stop using it immediately. Confirm
+DATA_DIR and the disk mount path before making any new records. Restore the code
+to the previous successful deploy and keep the original local backup untouched.

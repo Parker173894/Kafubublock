@@ -1,0 +1,27 @@
+KAFUBU PORTAL VERSION 3 UPGRADE NOTES
+=====================================
+
+VISUAL DESIGN
+- Added a modern responsive design across public pages and portal screens.
+- Added a sticky school header, mobile navigation, polished cards, forms,
+  tables, buttons, alerts, profiles and footer.
+- Redesigned the homepage and academic department pages.
+
+AUTOMATIC DEPARTMENT RECORDS
+- Every HOD registration is automatically assigned to that HOD's department.
+- A submitted form cannot move the teacher to another department.
+- New teachers appear immediately on the correct public department page.
+- When a teacher edits the profile, the department staff card updates from
+  the same live database record.
+- The related staff-return record is synchronised at the same time.
+- Management profile edits and department reassignments are also synchronised.
+- Inactive Subject Teacher accounts are hidden from public department pages.
+
+HOW TO TEST
+1. Login as an HOD using Other Portal Login.
+2. Select Register New Subject Teacher.
+3. Confirm the department is displayed automatically and cannot be changed.
+4. Complete registration and open View Department Staff Page.
+5. Logout and use Teacher Login with the new credentials.
+6. Change the temporary password, edit the teacher profile and save.
+7. Open View My Department Profile and confirm the new details are displayed.
