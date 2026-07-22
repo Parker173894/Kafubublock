@@ -50,6 +50,15 @@ MODERN DESIGN UPGRADE
 - Clear live-record indicators and automatic department-assignment messages.
 - Improved keyboard focus, reduced-motion support and readable mobile layouts.
 
+PUPIL RESULT LOOKUP UPGRADE
+---------------------------
+- A public Check Pupil Results page is available at /pupil-results.
+- Pupils enter both their student number and full registered name.
+- Results are shown only when both details match the same pupil record.
+- The lookup follows the existing management-controlled results portal status.
+- Repeated unsuccessful searches are temporarily limited for privacy.
+- Public result pages are marked no-cache and are hidden from search engines.
+
 BACKUP AND RESTORE
 ------------------
 - Headteacher and HR accounts can open Portal > Backup and Restore Centre.

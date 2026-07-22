@@ -120,6 +120,8 @@ ALLOWED_DOCUMENT_EXTENSIONS = {'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx
 ALLOWED_VIDEO_EXTENSIONS = {'mp4', 'webm', 'mov'}
 LOGIN_MAX_ATTEMPTS = 5
 LOGIN_LOCK_MINUTES = 15
+RESULT_LOOKUP_MAX_ATTEMPTS = 8
+RESULT_LOOKUP_LOCK_MINUTES = 15
 MAX_GUIDANCE_VIDEO_MB = _env_int('MAX_GUIDANCE_VIDEO_MB', 50, 1, MAX_UPLOAD_MB)
 MAX_GUIDANCE_VIDEO_BYTES = MAX_GUIDANCE_VIDEO_MB * 1024 * 1024
 MAX_IMAGE_MB = _env_int('MAX_IMAGE_MB', 8, 1, MAX_UPLOAD_MB)
@@ -714,6 +716,31 @@ def record_login_attempt(username, success):
     conn.commit(); conn.close()
 
 
+def too_many_result_lookup_attempts():
+    """Limit repeated public result searches from the same connection."""
+    cutoff = (datetime.now() - timedelta(minutes=RESULT_LOOKUP_LOCK_MINUTES)).strftime('%Y-%m-%d %H:%M:%S')
+    conn = get_db()
+    row = conn.execute('''SELECT COUNT(*) AS total FROM login_attempts
+                          WHERE username='pupil-result-lookup' AND ip_address=?
+                          AND success='No' AND attempted_at>=?''',
+                       (get_client_ip(), cutoff)).fetchone()
+    conn.close()
+    return row['total'] >= RESULT_LOOKUP_MAX_ATTEMPTS
+
+
+def record_result_lookup_attempt(success):
+    conn = get_db()
+    conn.execute('INSERT INTO login_attempts(username, ip_address, success, attempted_at) VALUES(?,?,?,?)',
+                 ('pupil-result-lookup', get_client_ip(), 'Yes' if success else 'No',
+                  datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
+    conn.commit(); conn.close()
+
+
+def normalized_pupil_name(value):
+    """Compare registered names without being affected by capital letters or extra spaces."""
+    return ' '.join((value or '').casefold().split())
+
+
 @app.before_request
 def validate_csrf():
     if request.method in {'POST', 'PUT', 'PATCH', 'DELETE'}:
@@ -747,8 +774,10 @@ def set_security_headers(response):
     response.headers['Content-Security-Policy'] = "default-src 'self'; img-src 'self' data:; media-src 'self'; frame-src https://www.google.com https://maps.google.com; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline';"
     if IS_PRODUCTION:
         response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
-    if session.get('user_id'):
+    if session.get('user_id') or request.endpoint == 'pupil_results_lookup':
         response.headers['Cache-Control'] = 'no-store, private'
+    if request.endpoint == 'pupil_results_lookup':
+        response.headers['X-Robots-Tag'] = 'noindex, nofollow'
     return response
 
 
@@ -1837,6 +1866,52 @@ def student_results():
         rows = conn.execute('SELECT * FROM results WHERE student_id=? ORDER BY academic_year DESC, term, subject', (selected_student_id,)).fetchall() if selected_student_id else []
         conn.close(); return render_template('student_results.html', student=student, results=rows, students=students_list)
     conn.close(); flash('You are not allowed to access that page.', 'danger'); return redirect(url_for('dashboard'))
+
+
+@app.route('/pupil-results', methods=['GET', 'POST'])
+def pupil_results_lookup():
+    """Allow a pupil to view results using the registered number and full name."""
+    portal_open = is_student_results_active()
+    student = None
+    rows = []
+
+    if request.method == 'POST':
+        if not portal_open:
+            flash('The pupil results portal is currently closed. Please check again after school management activates it.', 'warning')
+            return render_template('pupil_results_lookup.html', portal_open=False, student=None, results=[])
+
+        student_number = request.form.get('student_number', '').strip()[:40]
+        full_name = request.form.get('full_name', '').strip()[:150]
+
+        if too_many_result_lookup_attempts():
+            flash(f'Too many unsuccessful searches. Please wait {RESULT_LOOKUP_LOCK_MINUTES} minutes before trying again.', 'danger')
+            return render_template('pupil_results_lookup.html', portal_open=True, student=None, results=[])
+
+        if not student_number or not full_name:
+            record_result_lookup_attempt(False)
+            flash('Enter both your student number and your full registered name.', 'warning')
+            return render_template('pupil_results_lookup.html', portal_open=True, student=None, results=[])
+
+        conn = get_db()
+        candidate = conn.execute('SELECT * FROM students WHERE lower(trim(student_number))=lower(?) LIMIT 1',
+                                 (student_number,)).fetchone()
+        name_matches = bool(candidate and normalized_pupil_name(candidate['full_name']) == normalized_pupil_name(full_name))
+
+        if name_matches:
+            student = candidate
+            rows = conn.execute('''SELECT * FROM results WHERE student_id=?
+                                   ORDER BY academic_year DESC, term, subject''',
+                                (student['id'],)).fetchall()
+        conn.close()
+        record_result_lookup_attempt(name_matches)
+
+        if not name_matches:
+            log_security_event('Unsuccessful pupil result lookup', details='The supplied pupil number and name did not match.')
+            flash('The student number and name did not match a registered pupil. Check both entries and try again.', 'danger')
+        else:
+            log_security_event('Pupil result lookup successful', username=student['student_number'], role='student')
+
+    return render_template('pupil_results_lookup.html', portal_open=portal_open, student=student, results=rows)
 
 @app.route('/result-analysis')
 @login_required

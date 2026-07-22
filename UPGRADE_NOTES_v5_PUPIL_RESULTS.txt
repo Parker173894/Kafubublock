@@ -1,0 +1,18 @@
+KAFUBU PORTAL VERSION 5 - PUPIL RESULT LOOKUP
+==============================================
+
+- Added a Check Pupil Results page at /pupil-results.
+- Pupils can enter their student number and full registered name.
+- Both details must match the same pupil record before results are displayed.
+- Names are matched without being affected by capital letters or extra spaces.
+- Added links from the homepage, navigation and portal login page.
+- The Headteacher, Deputy Headteacher or HR can continue opening and closing
+  pupil result access from the existing Pupil Portal Control page.
+- Repeated wrong searches are limited for 15 minutes.
+- Public result pages are not cached and are excluded from search indexing.
+- Staff result entry, analysis and authenticated pupil accounts are unchanged.
+
+RENDER UPDATE
+-------------
+Upload the contents of this package to the existing GitHub repository and
+commit to the main branch. No new Render environment variable is required.
