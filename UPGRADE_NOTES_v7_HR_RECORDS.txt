@@ -1,0 +1,19 @@
+KAFUBU PORTAL VERSION 7 - HR TEACHER AND PUPIL RECORDS
+=======================================================
+
+- Added an HR Teacher and Pupil Records page at /hr-records.
+- Added totals for active Subject Teachers, HODs, total teaching staff and
+  registered pupils.
+- Added teaching-staff totals by department and pupil totals by grade/form.
+- Added pupil search by student number, name or class.
+- HR can change a pupil's current grade/form, class and class teacher.
+- Every change is saved in a grade-change history with previous and new values.
+- Historical academic results are not rewritten when the pupil is promoted.
+- Headteacher and Deputy Headteacher can view the combined records page, but
+  only HR can make pupil grade changes.
+
+RENDER UPDATE
+-------------
+Upload the contents of this package to the existing GitHub repository and
+commit to the main branch. The database upgrade runs automatically and no new
+Render environment variable is required.

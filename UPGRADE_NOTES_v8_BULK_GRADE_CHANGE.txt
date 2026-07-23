@@ -1,0 +1,19 @@
+KAFUBU PORTAL VERSION 8 - BULK PUPIL GRADE CHANGES
+===================================================
+
+- Selecting a grade on HR Teacher and Pupil Records displays every pupil in
+  that grade.
+- Each grade summary has a Show All Pupils button.
+- HR can move all pupils in the selected grade to a new grade/form at once.
+- HR can optionally assign one new class and one new class teacher to the
+  entire selected grade.
+- Leaving the bulk class or class-teacher field blank keeps each pupil's
+  existing class or class teacher.
+- HR must type CHANGE ALL before a bulk update can run.
+- A separate grade-change history entry is created for every affected pupil.
+- Pupil login accounts and historical academic results remain unchanged.
+
+RENDER UPDATE
+-------------
+Upload the contents of this package to the existing GitHub repository and
+commit to the main branch. No new Render environment variable is required.

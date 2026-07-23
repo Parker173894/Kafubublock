@@ -253,6 +253,21 @@ def init_db():
     if not column_exists(c, 'students', 'class_teacher'):
         c.execute('ALTER TABLE students ADD COLUMN class_teacher TEXT')
 
+    c.execute('''CREATE TABLE IF NOT EXISTS student_grade_changes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        student_id INTEGER,
+        student_number TEXT NOT NULL,
+        student_name TEXT NOT NULL,
+        previous_grade TEXT NOT NULL,
+        previous_class TEXT NOT NULL,
+        previous_class_teacher TEXT,
+        new_grade TEXT NOT NULL,
+        new_class TEXT NOT NULL,
+        new_class_teacher TEXT,
+        changed_by TEXT NOT NULL,
+        changed_at TEXT NOT NULL
+    )''')
+
     c.execute('''CREATE TABLE IF NOT EXISTS portal_settings (
         setting_key TEXT PRIMARY KEY,
         setting_value TEXT NOT NULL,
@@ -1469,6 +1484,9 @@ def dashboard():
     download_count=conn.execute('SELECT COUNT(*) AS total FROM result_download_logs').fetchone()['total']
     donation_count=conn.execute('SELECT COUNT(*) AS total FROM donation_pledges').fetchone()['total']
     staff_return_count=conn.execute('SELECT COUNT(*) AS total FROM staff_returns').fetchone()['total']
+    active_subject_teacher_count=conn.execute("SELECT COUNT(*) AS total FROM users WHERE role='teacher' AND is_active=1").fetchone()['total']
+    active_hod_count=conn.execute("SELECT COUNT(*) AS total FROM users WHERE role LIKE 'hod_%' AND is_active=1").fetchone()['total']
+    active_teaching_staff_count=active_subject_teacher_count + active_hod_count
     recent_materials=conn.execute('SELECT * FROM materials ORDER BY uploaded_at DESC LIMIT 6').fetchall()
     recent_docs=conn.execute('SELECT * FROM documents ORDER BY uploaded_at DESC LIMIT 6').fetchall()
     my_results=[]
@@ -1478,7 +1496,7 @@ def dashboard():
         if student:
             my_results = conn.execute('SELECT * FROM results WHERE student_id=? ORDER BY academic_year DESC, term, subject', (student['id'],)).fetchall()
     conn.close()
-    return render_template('dashboard.html', material_count=material_count, doc_count=doc_count, need_count=need_count, student_count=student_count, result_count=result_count, download_count=download_count, donation_count=donation_count, staff_return_count=staff_return_count, recent_materials=recent_materials, recent_docs=recent_docs, my_results=my_results)
+    return render_template('dashboard.html', material_count=material_count, doc_count=doc_count, need_count=need_count, student_count=student_count, result_count=result_count, download_count=download_count, donation_count=donation_count, staff_return_count=staff_return_count, active_subject_teacher_count=active_subject_teacher_count, active_hod_count=active_hod_count, active_teaching_staff_count=active_teaching_staff_count, recent_materials=recent_materials, recent_docs=recent_docs, my_results=my_results)
 
 @app.route('/profile', methods=['GET','POST'])
 @login_required
@@ -1724,6 +1742,225 @@ def student_records():
     classes = conn.execute('SELECT DISTINCT class_name FROM students WHERE class_name IS NOT NULL AND class_name != "" ORDER BY class_name').fetchall()
     conn.close()
     return render_template('student_records.html', students=students_rows, total_students=total_students, filtered_total=filtered_total, grade_summary=grade_summary, class_summary=class_summary, gender_summary=gender_summary, selected_grade=selected_grade, selected_class=selected_class, classes=classes)
+
+
+@app.route('/hr-records')
+@login_required
+@roles_required('headteacher', 'deputy_headteacher', 'hr')
+def hr_records():
+    """Combined teaching-staff and pupil totals, with HR pupil-grade management."""
+    search = request.args.get('q', '').strip()[:100]
+    selected_grade = request.args.get('grade', '').strip()
+    if selected_grade not in GRADES:
+        selected_grade = ''
+
+    conn = get_db()
+    subject_teacher_count = conn.execute(
+        "SELECT COUNT(*) AS total FROM users WHERE role='teacher' AND is_active=1"
+    ).fetchone()['total']
+    hod_count = conn.execute(
+        "SELECT COUNT(*) AS total FROM users WHERE role LIKE 'hod_%' AND is_active=1"
+    ).fetchone()['total']
+    teaching_staff_count = subject_teacher_count + hod_count
+    pupil_count = conn.execute('SELECT COUNT(*) AS total FROM students').fetchone()['total']
+
+    teacher_department_summary = conn.execute('''
+        SELECT department,
+               SUM(CASE WHEN role='teacher' THEN 1 ELSE 0 END) AS subject_teachers,
+               SUM(CASE WHEN role LIKE 'hod_%' THEN 1 ELSE 0 END) AS hods,
+               COUNT(*) AS total
+        FROM users
+        WHERE is_active=1 AND (role='teacher' OR role LIKE 'hod_%')
+        GROUP BY department
+        ORDER BY department
+    ''').fetchall()
+    pupil_grade_summary = conn.execute('''
+        SELECT grade, COUNT(*) AS total
+        FROM students
+        GROUP BY grade
+        ORDER BY grade
+    ''').fetchall()
+
+    pupil_query = 'SELECT * FROM students WHERE 1=1'
+    pupil_params = []
+    if search:
+        pupil_query += ' AND (student_number LIKE ? OR full_name LIKE ? OR class_name LIKE ?)'
+        term = f'%{search}%'
+        pupil_params.extend([term, term, term])
+    if selected_grade:
+        pupil_query += ' AND grade=?'
+        pupil_params.append(selected_grade)
+    pupil_query += ' ORDER BY grade, class_name, full_name'
+    pupils = conn.execute(pupil_query, pupil_params).fetchall()
+
+    recent_grade_changes = conn.execute('''
+        SELECT * FROM student_grade_changes
+        ORDER BY changed_at DESC, id DESC
+        LIMIT 50
+    ''').fetchall()
+    conn.close()
+
+    return render_template(
+        'hr_records.html',
+        subject_teacher_count=subject_teacher_count,
+        hod_count=hod_count,
+        teaching_staff_count=teaching_staff_count,
+        pupil_count=pupil_count,
+        teacher_department_summary=teacher_department_summary,
+        pupil_grade_summary=pupil_grade_summary,
+        pupils=pupils,
+        recent_grade_changes=recent_grade_changes,
+        search=search,
+        selected_grade=selected_grade,
+    )
+
+
+@app.route('/hr-change-pupil-grade/<int:student_id>', methods=['POST'])
+@login_required
+@roles_required('hr')
+def hr_change_pupil_grade(student_id):
+    """Allow HR to promote or transfer a pupil while preserving past results."""
+    new_grade = request.form.get('grade', '').strip()
+    new_class = request.form.get('class_name', '').strip()[:40]
+    new_class_teacher = request.form.get('class_teacher', '').strip()[:150]
+    return_search = request.form.get('return_q', '').strip()[:100]
+    return_grade = request.form.get('return_grade', '').strip()
+    if return_grade not in GRADES:
+        return_grade = ''
+
+    if new_grade not in GRADES:
+        flash('Choose a valid grade or form.', 'danger')
+        return redirect(url_for('hr_records', q=return_search, grade=return_grade))
+    if not new_class:
+        flash('Enter the pupil’s new class.', 'danger')
+        return redirect(url_for('hr_records', q=return_search, grade=return_grade))
+
+    conn = get_db()
+    student = conn.execute('SELECT * FROM students WHERE id=?', (student_id,)).fetchone()
+    if not student:
+        conn.close()
+        flash('Pupil record not found.', 'danger')
+        return redirect(url_for('hr_records', q=return_search, grade=return_grade))
+
+    old_grade = student['grade']
+    old_class = student['class_name']
+    old_class_teacher = student['class_teacher'] or ''
+    if old_grade == new_grade and old_class == new_class and old_class_teacher == new_class_teacher:
+        conn.close()
+        flash('No grade, class or class-teacher change was made.', 'info')
+        return redirect(url_for('hr_records', q=return_search, grade=return_grade))
+
+    changed_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    conn.execute('UPDATE students SET grade=?, class_name=?, class_teacher=? WHERE id=?',
+                 (new_grade, new_class, new_class_teacher, student_id))
+    conn.execute('''INSERT INTO student_grade_changes(
+        student_id, student_number, student_name, previous_grade, previous_class,
+        previous_class_teacher, new_grade, new_class, new_class_teacher,
+        changed_by, changed_at
+    ) VALUES(?,?,?,?,?,?,?,?,?,?,?)''', (
+        student_id, student['student_number'], student['full_name'], old_grade,
+        old_class, old_class_teacher, new_grade, new_class, new_class_teacher,
+        session.get('full_name', 'HR'), changed_at
+    ))
+    conn.commit()
+    conn.close()
+
+    log_security_event(
+        'HR changed pupil grade',
+        username=student['student_number'],
+        role='hr',
+        details=f'{old_grade} {old_class} changed to {new_grade} {new_class}. Historical results were preserved.'
+    )
+    flash(
+        f'{student["full_name"]} was updated from {old_grade} {old_class} to {new_grade} {new_class}. '
+        'Previous academic results were preserved.',
+        'success'
+    )
+    return redirect(url_for('hr_records', q=return_search, grade=return_grade))
+
+
+@app.route('/hr-change-grade-bulk', methods=['POST'])
+@login_required
+@roles_required('hr')
+def hr_change_grade_bulk():
+    """Allow HR to update every pupil in one selected grade in a single audited action."""
+    current_grade = request.form.get('current_grade', '').strip()
+    new_grade = request.form.get('new_grade', '').strip()
+    new_class_for_all = request.form.get('new_class', '').strip()[:40]
+    new_class_teacher_for_all = request.form.get('new_class_teacher', '').strip()[:150]
+    confirmation = request.form.get('confirmation', '').strip()
+
+    if current_grade not in GRADES or new_grade not in GRADES:
+        flash('Choose a valid current grade and new grade.', 'danger')
+        return redirect(url_for('hr_records', grade=current_grade if current_grade in GRADES else ''))
+    if confirmation != 'CHANGE ALL':
+        flash('Bulk change cancelled. Type CHANGE ALL exactly to confirm.', 'danger')
+        return redirect(url_for('hr_records', grade=current_grade))
+    if current_grade == new_grade and not new_class_for_all and not new_class_teacher_for_all:
+        flash('Choose a different grade or provide a new class or class teacher for all pupils.', 'warning')
+        return redirect(url_for('hr_records', grade=current_grade))
+
+    conn = get_db()
+    pupils = conn.execute(
+        'SELECT * FROM students WHERE grade=? ORDER BY class_name, full_name',
+        (current_grade,)
+    ).fetchall()
+    if not pupils:
+        conn.close()
+        flash(f'No pupils are currently registered in {current_grade}.', 'warning')
+        return redirect(url_for('hr_records', grade=current_grade))
+
+    changed_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    changed_by = session.get('full_name', 'HR')
+    changed_count = 0
+    for pupil in pupils:
+        old_class_teacher = pupil['class_teacher'] or ''
+        target_class = new_class_for_all or pupil['class_name']
+        target_class_teacher = new_class_teacher_for_all or old_class_teacher
+        if (
+            pupil['grade'] == new_grade
+            and pupil['class_name'] == target_class
+            and old_class_teacher == target_class_teacher
+        ):
+            continue
+
+        conn.execute(
+            'UPDATE students SET grade=?, class_name=?, class_teacher=? WHERE id=?',
+            (new_grade, target_class, target_class_teacher, pupil['id'])
+        )
+        conn.execute('''INSERT INTO student_grade_changes(
+            student_id, student_number, student_name, previous_grade, previous_class,
+            previous_class_teacher, new_grade, new_class, new_class_teacher,
+            changed_by, changed_at
+        ) VALUES(?,?,?,?,?,?,?,?,?,?,?)''', (
+            pupil['id'], pupil['student_number'], pupil['full_name'], pupil['grade'],
+            pupil['class_name'], old_class_teacher, new_grade, target_class,
+            target_class_teacher, changed_by, changed_at
+        ))
+        changed_count += 1
+
+    conn.commit()
+    conn.close()
+
+    if not changed_count:
+        flash('No pupil records required changing.', 'info')
+        return redirect(url_for('hr_records', grade=current_grade))
+
+    log_security_event(
+        'HR bulk changed pupil grade',
+        role='hr',
+        details=(
+            f'{changed_count} pupils moved from {current_grade} to {new_grade}. '
+            f'Class for all: {new_class_for_all or "kept individually"}. '
+            f'Historical results were preserved.'
+        )
+    )
+    flash(
+        f'{changed_count} pupils were updated from {current_grade} to {new_grade}. '
+        'Each change was recorded and previous academic results were preserved.',
+        'success'
+    )
+    return redirect(url_for('hr_records', grade=new_grade))
 
 @app.route('/download-student-records-excel')
 @login_required

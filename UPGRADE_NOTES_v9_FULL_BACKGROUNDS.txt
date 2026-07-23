@@ -1,0 +1,18 @@
+KAFUBU PORTAL VERSION 9 - COMPLETE BACKGROUND PICTURES
+======================================================
+
+- Uploaded website backgrounds now display the complete picture.
+- Changed background sizing from cover to contain to prevent cropping.
+- Removed the slideshow zoom effect that could cut off picture edges.
+- Reduced the light overlay so pictures are clearer.
+- Background management previews now show complete images.
+- Added a View Full Picture option for every uploaded background.
+
+Depending on the picture shape and the screen shape, empty space can appear at
+the sides or top and bottom. This is necessary to show the entire picture
+without cutting any part of it.
+
+RENDER UPDATE
+-------------
+Upload the contents of this package to the existing GitHub repository and
+commit to the main branch. No new Render environment variable is required.

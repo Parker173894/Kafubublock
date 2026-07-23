@@ -1,0 +1,16 @@
+KAFUBU PORTAL VERSION 6 - VISUAL AND LOGIN REFINEMENTS
+=======================================================
+
+- Guidance and Counselling post text is now dark and clearly readable.
+- Guidance post cards now use a soft green-and-gold background.
+- Uploaded active website background pictures are more visible.
+- The site overlay was reduced while retaining readable content panels.
+- Homepage backgrounds are visible through the hero section.
+- "Other Portal Login" is now named "Admin Login".
+- The duplicate Subject Teacher Login button was removed from Admin Login.
+- The dedicated teacher page is now simply titled "Teacher Login".
+
+RENDER UPDATE
+-------------
+Upload the contents of this package to the existing GitHub repository and
+commit to the main branch. No new Render environment variable is required.

@@ -59,6 +59,37 @@ PUPIL RESULT LOOKUP UPGRADE
 - Repeated unsuccessful searches are temporarily limited for privacy.
 - Public result pages are marked no-cache and are hidden from search engines.
 
+VISUAL AND LOGIN REFINEMENTS
+----------------------------
+- Guidance and Counselling posts use dark readable text on a soft green-and-gold
+  background, including the homepage post preview.
+- Uploaded active website backgrounds are now clearly visible through a lighter
+  overlay while all page text remains readable.
+- "Other Portal Login" has been renamed to "Admin Login".
+- The duplicate Subject Teacher login button was removed from the Admin Login
+  page; teachers continue using the dedicated Teacher Login.
+
+HR TEACHER AND PUPIL RECORDS
+----------------------------
+- HR has a combined records page showing active Subject Teachers, active HODs,
+  total teaching staff and total registered pupils.
+- Teaching-staff totals are summarised by department.
+- Pupil totals are summarised by grade/form.
+- HR can search pupils and change their current grade, class and class teacher.
+- Every grade change records the old and new details, HR officer and date.
+- Historical academic results are preserved under the grade in which they were
+  earned.
+- Selecting a grade displays every pupil currently registered in that grade.
+- HR can change all pupils in a selected grade at once, with optional shared
+  class and class-teacher assignments.
+
+FULL BACKGROUND PICTURE DISPLAY
+-------------------------------
+- Website background pictures use full-image display instead of cropping.
+- The slideshow zoom effect was removed so picture edges remain visible.
+- The light overlay was reduced so uploaded pictures appear more clearly.
+- Background previews use full-image display and can be opened at full size.
+
 BACKUP AND RESTORE
 ------------------
 - Headteacher and HR accounts can open Portal > Backup and Restore Centre.
