@@ -1,0 +1,50 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="page wide">
+  <h2>Staff Return Records</h2>
+  <p>HR can view, edit and download staff details submitted by teachers and other staff members. HR can also set extra details required from teachers.</p>
+
+  <form method="get" class="form-inline">
+    <label>Filter by Department</label>
+    <select name="department">
+      <option value="">All Departments</option>
+      {% for key, name in DEPARTMENTS.items() %}
+        <option value="{{ key }}" {% if selected_department==key %}selected{% endif %}>{{ name }}</option>
+      {% endfor %}
+    </select>
+    <button class="btn" type="submit">Filter</button>
+    <a class="btn secondary" href="{{ url_for('download_staff_return_records', department=selected_department) }}">Download CSV</a>
+    <a class="btn" href="{{ url_for('download_staff_return_records_excel', department=selected_department) }}">Download Excel</a>
+    {% if session.role == 'hr' %}<a class="btn secondary" href="{{ url_for('manage_staff_return_details') }}">Set Details Needed from Teachers</a>{% endif %}
+  </form>
+
+  <table>
+    <tr>
+      <th>Name</th><th>Position</th><th>Department</th><th>Phone</th><th>Email</th><th>Subjects</th><th>Classes</th><th>Qualification</th><th>Status</th><th>Updated</th><th>Action</th>
+    </tr>
+    {% for r in records %}
+      <tr>
+        <td>{{ r.full_name }}<br><small>{{ r.employee_number or 'No staff number' }}</small></td>
+        <td>{{ r.position }}</td>
+        <td>{{ DEPARTMENTS.get(r.department, r.department or 'Not set') }}</td>
+        <td>{{ r.phone }}</td>
+        <td>{{ r.email }}</td>
+        <td>{{ r.subjects_taught }}</td>
+        <td>{{ r.classes_taught }}</td>
+        <td>{{ r.highest_qualification }}</td>
+        <td>{{ r.employment_status }}</td>
+        <td>{{ r.updated_at }}</td>
+        <td>
+          {% if session.role == 'hr' %}
+            <a class="btn small" href="{{ url_for('edit_staff_return', record_id=r.id) }}">Edit</a>
+          {% else %}
+            <small>View only</small>
+          {% endif %}
+        </td>
+      </tr>
+    {% else %}
+      <tr><td colspan="11">No staff return records have been submitted yet.</td></tr>
+    {% endfor %}
+  </table>
+</section>
+{% endblock %}

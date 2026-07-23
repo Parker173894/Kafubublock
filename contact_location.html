@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+{% block title %}Contact & Location - Kafubu Block Secondary School{% endblock %}
+{% block content %}
+<section class="page">
+  <h2>Contact and Location</h2>
+  <p class="hint">{{ content.contact_message }}</p>
+
+  {% if session.role == 'headteacher' %}
+    <p><a class="btn" href="{{ url_for('edit_contact_location') }}">Edit Contact and Location</a></p>
+  {% endif %}
+
+  <div class="cards three">
+    <div class="card">
+      <h3>School Contact</h3>
+      <p><strong>School:</strong> Kafubu Block Secondary School</p>
+      <p><strong>Phone:</strong> {{ content.contact_phone }}</p>
+      <p><strong>Email:</strong> {{ content.contact_email }}</p>
+      <p><strong>Office Hours:</strong> {{ content.office_hours }}</p>
+    </div>
+
+    <div class="card">
+      <h3>Enquiries</h3>
+      <p>For school calendar, donor needs, donations and general enquiries, visitors can use the links below.</p>
+      <p><a class="mini-btn" href="{{ url_for('school_calendar') }}">School Calendar</a></p>
+      <p><a class="mini-btn" href="{{ url_for('donor_needs') }}">Donor Needs</a></p>
+      <p><a class="mini-btn" href="{{ url_for('donate') }}">Donate</a></p>
+    </div>
+
+    <div class="card">
+      <h3>Location</h3>
+      <p><strong>Location:</strong> {{ content.school_location }}</p>
+      <p class="hint">The map below helps visitors locate the school using Google Maps.</p>
+    </div>
+  </div>
+
+  <div class="card map-card">
+    <h3>Google Map</h3>
+    <div class="map-responsive">
+      <iframe
+        src="https://www.google.com/maps?q={{ content.map_query|urlencode }}&output=embed"
+        width="100%"
+        height="420"
+        style="border:0;"
+        allowfullscreen=""
+        loading="lazy"
+        referrerpolicy="no-referrer-when-downgrade">
+      </iframe>
+    </div>
+  </div>
+</section>
+{% endblock %}

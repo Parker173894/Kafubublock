@@ -1,0 +1,19 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="page">
+  <h2>Activate / Deactivate Pupil Results Portal</h2>
+  <p>Use this page when the school is ready to release or hide pupil results.</p>
+  <div class="card">
+    <h3>Current Status: {% if setting and setting.setting_value == 'active' %}<span class="badge">Active</span>{% else %}<span class="badge danger">Inactive</span>{% endif %}</h3>
+    {% if setting %}<p>Last updated by {{ setting.updated_by or 'System' }} on {{ setting.updated_at or 'N/A' }}.</p>{% endif %}
+  </div>
+  <form method="post" class="form-card wide">
+    <label>Pupil Results Portal Status</label>
+    <select name="status">
+      <option value="active" {% if setting and setting.setting_value == 'active' %}selected{% endif %}>Active - pupils can view and download results</option>
+      <option value="inactive" {% if setting and setting.setting_value == 'inactive' %}selected{% endif %}>Inactive - pupils cannot view or download results</option>
+    </select>
+    <button class="btn">Save Portal Status</button>
+  </form>
+</section>
+{% endblock %}

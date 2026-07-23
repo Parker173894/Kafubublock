@@ -1,0 +1,60 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="hero home-hero">
+  <div class="hero-copy">
+    <span class="eyebrow">Welcome to our digital school</span>
+    <h2>Learning, leadership and opportunity in one connected space.</h2>
+    <p>Kafubu Block Secondary School brings departments, teachers, learners, families and partners together through a secure, modern portal.</p>
+    <div class="hero-actions">
+      <a class="btn" href="{{ url_for('departments') }}">Explore Departments</a>
+      <a class="btn ghost" href="{{ url_for('pupil_results_lookup') }}">Check Pupil Results</a>
+      <a class="btn ghost" href="{{ url_for('teacher_login') }}">Teacher Login</a>
+      <a class="btn ghost" href="{{ url_for('login') }}">Admin Login</a>
+    </div>
+    <div class="hero-trust-row">
+      <span>✓ Secure individual accounts</span><span>✓ Department-linked profiles</span><span>✓ Digital school records</span>
+    </div>
+  </div>
+
+  <div class="card homepage-guidance-card">
+    <span class="eyebrow dark">Learner wellbeing</span>
+    <h3>Guidance and Counselling</h3>
+    <p>Latest educational posts and videos shared by the Guidance and Counselling team.</p>
+    <div class="guidance-preview-list">
+      {% for post in guidance_posts %}
+        <article class="guidance-preview-item">
+          <p><span class="badge">{{ post.category }}</span></p>
+          <h4>{{ post.title }}</h4>
+          <p>{{ post.message }}</p>
+          {% if post.video_filename %}
+            <video controls class="video-box homepage-video-box"><source src="{{ url_for('guidance_video', filename=post.video_filename) }}">Your browser does not support video playback.</video>
+          {% endif %}
+          <p class="muted">{{ post.posted_by }} • {{ post.posted_at }}</p>
+        </article>
+      {% else %}<div class="guidance-preview-item"><p>No guidance posts have been uploaded yet.</p></div>{% endfor %}
+    </div>
+    <a class="btn secondary" href="{{ url_for('guidance_posts') }}">View All Guidance Resources</a>
+  </div>
+</section>
+
+<section class="feature-section">
+  <div class="section-heading"><span class="eyebrow dark">One school, one platform</span><h2>Everything the school community needs</h2><p>Clear digital workflows designed for everyday school work.</p></div>
+  <div class="cards three feature-grid">
+    <article class="card feature-card"><span class="feature-icon">01</span><h3>Department Resources</h3><p>HODs organise learning materials while teachers access the right resources for their departments.</p></article>
+    <article class="card feature-card"><span class="feature-icon">02</span><h3>Pupil Results</h3><p>Secure result entry, analysis and PDF report forms with management-controlled publishing.</p></article>
+    <article class="card feature-card"><span class="feature-icon">03</span><h3>Teacher Profiles</h3><p>Every Subject Teacher has an individual login and a live profile connected to the correct department.</p></article>
+    <article class="card feature-card"><span class="feature-icon">04</span><h3>School Administration</h3><p>Leadership and HR manage official documents, staff returns, security records and school information.</p></article>
+    <article class="card feature-card"><span class="feature-icon">05</span><h3>Calendar & Communication</h3><p>Keep learners, staff and families informed about important dates, meetings and school activities.</p></article>
+    <article class="card feature-card"><span class="feature-icon">06</span><h3>Community Support</h3><p>Partners and donors can see priority needs and pledge meaningful support to the school.</p><a class="mini-btn" href="{{ url_for('donate') }}">Support the School</a></article>
+  </div>
+</section>
+
+<section class="needs-section">
+  <div class="section-heading"><span class="eyebrow dark">Make a difference</span><h2>Current Priority Needs</h2><p>Practical opportunities to strengthen teaching and learning at Kafubu Block Secondary School.</p></div>
+  <div class="cards three">
+    {% for need in needs %}
+      <article class="card need"><span class="priority {{ need.priority|lower }}">{{ need.priority }} priority</span><h3>{{ need.item }}</h3><p>{{ need.description }}</p><p><b>Quantity:</b> {{ need.quantity }}</p><a class="btn" href="{{ url_for('donate', need_id=need.id) }}">Donate or Pledge Support</a></article>
+    {% else %}<div class="card"><h3>No current needs published</h3><p>Please check again later.</p></div>{% endfor %}
+  </div>
+</section>
+{% endblock %}

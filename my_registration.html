@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="page">
+  <h2>Pupil Registration</h2>
+  <p>This page shows the learner registration details recorded by the school.</p>
+
+  {% if student %}
+  <div class="card wide">
+    <h3>{{ student.full_name }}</h3>
+    <table>
+      <tr><th>Pupil Number</th><td>{{ student.student_number }}</td></tr>
+      <tr><th>Full Name</th><td>{{ student.full_name }}</td></tr>
+      <tr><th>Grade/Form</th><td>{{ student.grade }}</td></tr>
+      <tr><th>Class</th><td>{{ student.class_name }}</td></tr>
+      <tr><th>Class Teacher</th><td>{{ student.class_teacher or 'Not assigned' }}</td></tr>
+      <tr><th>Gender</th><td>{{ student.gender }}</td></tr>
+      <tr><th>Parent/Guardian Phone</th><td>{{ student.parent_phone }}</td></tr>
+      <tr><th>Registered On</th><td>{{ student.created_at }}</td></tr>
+    </table>
+  </div>
+  {% else %}
+  <div class="notice warning">
+    Your pupil registration record was not found. Please contact the school administration.
+  </div>
+  {% endif %}
+
+  <div class="portal-actions">
+    <a class="btn" href="{{ url_for('dashboard') }}">Back to Pupil Portal</a>
+    {% if student_results_active %}
+      <a class="btn" href="{{ url_for('student_results') }}">View My Results</a>
+      <a class="btn" href="{{ url_for('download_my_result_pdf') }}">Download Results PDF</a>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

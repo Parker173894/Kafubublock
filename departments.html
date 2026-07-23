@@ -1,0 +1,19 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="page department-directory">
+  <div class="section-heading">
+    <span class="eyebrow dark">Academic excellence</span>
+    <h2>Academic Departments</h2>
+    <p>Meet our departmental teams and explore the learning areas that shape every pupil’s journey.</p>
+  </div>
+  <div class="cards dept-grid">
+    {% for key,name in DEPARTMENTS.items() %}
+      <a class="card dept" href="{{ url_for('department_detail', dept=key) }}">
+        <span class="department-number">0{{ loop.index }}</span>
+        <h3>{{ name }}</h3>
+        <p>View the Head of Department, current Subject Teachers and recent learning materials.</p>
+      </a>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}

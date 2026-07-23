@@ -1,0 +1,50 @@
+{% extends 'base.html' %}
+{% block title %}Manage School Calendar{% endblock %}
+{% block content %}
+<section class="page">
+  <h2>Add / Manage School Calendar</h2>
+  <p>Add important school activities such as opening day, tests, examinations, meetings, sports days and closing day.</p>
+
+  <form method="POST" class="form-card wide-card">
+    <label>Event Title</label>
+    <input type="text" name="title" placeholder="e.g. End of Term Examination" required>
+    <div class="cards three">
+      <div><label>Date</label><input type="date" name="event_date" required></div>
+      <div><label>Start Time</label><input type="time" name="start_time"></div>
+      <div><label>End Time</label><input type="time" name="end_time"></div>
+    </div>
+    <div class="cards three">
+      <div><label>Category</label><select name="category"><option>School Event</option><option>Assessment</option><option>Meeting</option><option>Sports</option><option>Holiday</option><option>Guidance</option><option>Examination</option></select></div>
+      <div><label>Venue</label><input type="text" name="venue" placeholder="e.g. School Hall"></div>
+      <div><label>Audience</label><input type="text" name="audience" placeholder="e.g. All learners"></div>
+    </div>
+    <label>Description</label>
+    <textarea name="description" placeholder="Describe the activity"></textarea>
+    <button class="btn" type="submit">Save Calendar Event</button>
+    <a class="btn secondary" href="{{ url_for('school_calendar') }}">View Public Calendar</a>
+  </form>
+
+  <h3>Calendar Events</h3>
+  <table>
+    <tr><th>Date</th><th>Time</th><th>Title</th><th>Category</th><th>Venue</th><th>Audience</th><th>Action</th></tr>
+    {% for e in events %}
+      <tr>
+        <td>{{ e.event_date }}</td>
+        <td>{{ e.start_time }}{% if e.end_time %} - {{ e.end_time }}{% endif %}</td>
+        <td>{{ e.title }}</td>
+        <td>{{ e.category }}</td>
+        <td>{{ e.venue }}</td>
+        <td>{{ e.audience }}</td>
+        <td>
+          <a class="btn small" href="{{ url_for('edit_school_calendar_event', event_id=e.id) }}">Edit</a>
+          <form method="POST" action="{{ url_for('delete_school_calendar_event', event_id=e.id) }}" style="display:inline" onsubmit="return confirm('Delete this calendar event?');">
+            <button class="btn small danger" type="submit">Delete</button>
+          </form>
+        </td>
+      </tr>
+    {% else %}
+      <tr><td colspan="7">No calendar events added yet.</td></tr>
+    {% endfor %}
+  </table>
+</section>
+{% endblock %}

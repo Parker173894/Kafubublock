@@ -1,0 +1,23 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="page">
+  <h2>School Donor Needs</h2>
+  <p>Below are areas where Kafubu Block Secondary School requires support. Donors can click <b>Donate / Pledge Support</b> to support a specific need or make a general donation.</p>
+  <a class="btn" href="{{ url_for('donate') }}">Donate to the School</a>
+  <div class="cards dept-grid">
+    {% for n in needs %}
+      <div class="card need">
+        <span class="priority {{ n.priority|lower }}">{{ n.priority }}</span>
+        <h3>{{ n.item }}</h3>
+        <p>{{ n.description }}</p>
+        <p><b>Quantity:</b> {{ n.quantity }}</p>
+        <p><b>Estimated Cost:</b> {{ n.estimated_cost }}</p>
+        <p><b>Status:</b> {{ n.status }}</p>
+        <a class="btn" href="{{ url_for('donate', need_id=n.id) }}">Donate / Pledge Support</a>
+      </div>
+    {% else %}
+      <div class="card"><p>No donor needs have been posted yet.</p><a class="btn" href="{{ url_for('donate') }}">Make a General Donation</a></div>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}

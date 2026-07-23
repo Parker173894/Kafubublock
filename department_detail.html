@@ -1,0 +1,39 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="page department-page">
+  <header class="department-hero">
+    <div><span class="eyebrow">Academic department</span><h2>{{ DEPARTMENTS[dept] }}</h2><p>Meet the department team and access its latest teaching and learning resources.</p></div>
+    <div class="department-count"><strong>{{ teacher_count }}</strong><span>Subject Teacher{{ '' if teacher_count == 1 else 's' }}</span></div>
+  </header>
+
+  <div class="department-section-heading"><div><span class="eyebrow dark">Department leadership</span><h3>Head of Department</h3></div></div>
+  {% if hod %}
+    <article class="profile small hod-profile-card">
+      {% if hod.profile_picture %}<img class="avatar-img" src="{{ url_for('profile_picture', filename=hod.profile_picture) }}" alt="{{ hod.full_name }} profile picture">{% else %}<div class="avatar">{{ hod.full_name[:1] }}</div>{% endif %}
+      <div><h3>{{ hod.full_name }}</h3><p class="role-label">{{ hod.position }}</p>{% if hod.qualification %}<p><b>Qualification:</b> {{ hod.qualification }}</p>{% endif %}<p>{{ hod.bio or 'Department leadership profile.' }}</p>{% if session.get('user_id') == hod.id %}<a class="mini-btn" href="{{ url_for('profile') }}">Edit My HOD Profile</a>{% endif %}</div>
+    </article>
+  {% else %}<div class="empty-state"><h3>HOD profile not yet published</h3><p>Management can update the assigned HOD profile from the staff portal.</p></div>{% endif %}
+
+  <div class="department-section-heading"><div><span class="eyebrow dark">Automatically synchronised</span><h3>Subject Teacher Profiles</h3></div><span class="sync-badge">Live department record</span></div>
+  <div class="cards profiles department-staff-grid">
+    {% for teacher in teachers %}
+      <article class="card profile teacher-profile-card">
+        <div class="teacher-card-head">
+          {% if teacher.profile_picture %}<img class="avatar-img" src="{{ url_for('profile_picture', filename=teacher.profile_picture) }}" alt="{{ teacher.full_name }} profile picture">{% else %}<div class="avatar">{{ teacher.full_name[:1] }}</div>{% endif %}
+          <span class="verified-mark" title="Assigned to this department">✓</span>
+        </div>
+        <h3>{{ teacher.full_name }}</h3>
+        <p class="role-label">{{ teacher.position }}</p>
+        {% if teacher.qualification %}<p><b>Qualification:</b> {{ teacher.qualification }}</p>{% endif %}
+        {% if teacher.bio %}<p>{{ teacher.bio }}</p>{% endif %}
+        {% if teacher.email %}<p><a href="mailto:{{ teacher.email }}">{{ teacher.email }}</a></p>{% endif %}
+        {% if teacher.profile_updated_at %}<p class="muted profile-updated">Profile updated {{ teacher.profile_updated_at }}</p>{% endif %}
+        {% if session.get('user_id') == teacher.id %}<a class="mini-btn" href="{{ url_for('profile') }}">Edit My Profile</a>{% endif %}
+      </article>
+    {% else %}<div class="empty-state"><h3>No Subject Teachers recorded yet</h3><p>When the HOD registers a Subject Teacher, the profile will appear here automatically.</p></div>{% endfor %}
+  </div>
+
+  <div class="department-section-heading materials-heading"><div><span class="eyebrow dark">Department library</span><h3>Recent Materials</h3></div>{% if session.get('user_id') %}<a class="mini-btn" href="{{ url_for('materials', dept=dept) }}">View All Materials</a>{% endif %}</div>
+  <div class="table-wrap"><table><tr><th>Title</th><th>Description</th><th>Uploaded By</th><th>Date</th>{% if session.get('user_id') %}<th>Download</th>{% endif %}</tr>{% for material in materials %}<tr><td><b>{{ material.title }}</b></td><td>{{ material.description }}</td><td>{{ material.uploaded_by }}</td><td>{{ material.uploaded_at }}</td>{% if session.get('user_id') %}<td><a class="mini-btn" href="{{ url_for('download_material', filename=material.filename) }}">Download</a></td>{% endif %}</tr>{% else %}<tr><td colspan="5">No materials uploaded yet.</td></tr>{% endfor %}</table></div>
+</section>
+{% endblock %}

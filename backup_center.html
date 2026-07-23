@@ -1,0 +1,39 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="page">
+  <h2>Backup and Restore Centre</h2>
+  <div class="notice success"><b>Protected backups:</b> Each backup contains the school database and uploaded files. Store downloaded copies somewhere separate from the hosting server.</div>
+  <p>Automatic backup: <b>{{ 'Enabled' if auto_backup_enabled else 'Disabled' }}</b>. Up to {{ backup_retention }} automatic backups are retained.</p>
+
+  <form method="post" class="form-card wide">
+    <input type="hidden" name="action" value="create">
+    <h3>Create a Backup Now</h3>
+    <p>Create a backup before changing results, staff records, passwords or hosting settings.</p>
+    <button class="btn" type="submit">Create Complete Backup</button>
+  </form>
+
+  <h3>Available Backups</h3>
+  <table>
+    <tr><th>Backup</th><th>Created</th><th>Size</th><th>Download</th></tr>
+    {% for backup in backups %}
+      <tr>
+        <td>{{ backup.filename }}</td><td>{{ backup.created_at }}</td><td>{{ backup.size_mb }} MB</td>
+        <td><a class="mini-btn" href="{{ url_for('backup_download', filename=backup.filename) }}">Download</a></td>
+      </tr>
+    {% else %}<tr><td colspan="4">No backups have been created yet.</td></tr>{% endfor %}
+  </table>
+
+  {% if backups %}
+  <form method="post" class="form-card wide" onsubmit="return confirm('Restore this backup? Current data will be replaced. A safety backup will be created first.');">
+    <input type="hidden" name="action" value="restore">
+    <h3>Restore an Existing Backup</h3>
+    <div class="notice warning">Restoring replaces the database and overwrites matching uploaded files. The system creates a safety backup first and then signs you out.</div>
+    <label>Select Backup</label>
+    <select name="filename" required>{% for backup in backups %}<option value="{{ backup.filename }}">{{ backup.filename }}</option>{% endfor %}</select>
+    <label>Your Current Password</label><input type="password" name="current_password" required>
+    <label>Type RESTORE to Confirm</label><input name="confirmation" autocomplete="off" required>
+    <button class="btn danger" type="submit">Restore Selected Backup</button>
+  </form>
+  {% endif %}
+</section>
+{% endblock %}

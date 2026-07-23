@@ -1,0 +1,10 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="auth">
+  <div class="form-card wide-card">
+    <h2>{{ title }}</h2>
+    <p>{{ message }}</p>
+    <a class="btn" href="{{ url_for('index') }}">Return to Home</a>
+  </div>
+</section>
+{% endblock %}

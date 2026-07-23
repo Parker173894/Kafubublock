@@ -1,0 +1,22 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="page">
+  <h2>Edit Donor Need</h2>
+  <form method="post" class="form-card wide">
+    <label>Item Needed</label><input name="item" value="{{ need.item }}" required>
+    <label>Description</label><textarea name="description">{{ need.description }}</textarea>
+    <label>Quantity</label><input name="quantity" value="{{ need.quantity }}">
+    <label>Priority</label>
+    <select name="priority">
+      {% for p in ['High','Medium','Low'] %}<option {% if need.priority == p %}selected{% endif %}>{{ p }}</option>{% endfor %}
+    </select>
+    <label>Estimated Cost</label><input name="estimated_cost" value="{{ need.estimated_cost }}">
+    <label>Status</label>
+    <select name="status">
+      {% for s in ['Needed','Partly Supported','Supported'] %}<option {% if need.status == s %}selected{% endif %}>{{ s }}</option>{% endfor %}
+    </select>
+    <button class="btn">Save Changes</button>
+    <a class="btn secondary" href="{{ url_for('manage_donor_needs') }}">Cancel</a>
+  </form>
+</section>
+{% endblock %}

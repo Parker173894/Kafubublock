@@ -1,0 +1,47 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="page wide">
+  <h2>Set Staff Return Details Required from Teachers</h2>
+  <p>Use this page to add the kind of extra information HR wants teachers and staff to provide during staff return registration. Active fields will automatically appear on the Staff Return Registration form.</p>
+  <form method="post" class="form-card wide">
+    <h3>Add New Detail</h3>
+    <div class="grid two">
+      <label>Detail Name / Question<input name="field_label" placeholder="e.g. Payroll number, Bank name, Teaching load" required></label>
+      <label>Section<input name="section" value="Additional Details Required by HR"></label>
+      <label>Type of Answer<select name="field_type"><option value="text">Short text</option><option value="textarea">Long text</option><option value="number">Number</option><option value="date">Date</option><option value="email">Email</option><option value="select">Dropdown list</option></select></label>
+      <label>Options for Dropdown<input name="options" placeholder="Use commas, e.g. Yes, No, Not Applicable"></label>
+      <label>Required?<select name="is_required"><option value="Yes">Yes</option><option value="No" selected>No</option></select></label>
+      <label>Active?<select name="is_active"><option value="Yes" selected>Yes</option><option value="No">No</option></select></label>
+      <label>Display Order<input type="number" name="display_order" value="1" min="1"></label>
+    </div>
+    <button class="btn" type="submit">Add Staff Return Detail</button>
+    <a class="btn secondary" href="{{ url_for('staff_return_records') }}">Back to Staff Return Records</a>
+  </form>
+  <h3>Standard Staff Return Details</h3>
+  <p>These are the main staff return details. HR can edit the label, make a detail required, or remove it from the teachers' form by setting it inactive.</p>
+  <table>
+    <tr><th>Order</th><th>Detail</th><th>Section</th><th>Required</th><th>Shown on Form</th><th>Action</th></tr>
+    {% for f in core_fields %}
+      <tr>
+        <td>{{ f.display_order }}</td>
+        <td>{{ f.field_label }}<br><small>{{ f.field_key }}</small></td>
+        <td>{{ f.section }}</td>
+        <td>{{ f.is_required }}</td>
+        <td>{{ f.is_active }}</td>
+        <td>
+          <a class="btn small" href="{{ url_for('edit_core_staff_return_detail', field_id=f.id) }}">Edit</a>
+          <form method="post" action="{{ url_for('toggle_core_staff_return_detail', field_id=f.id) }}" style="display:inline" onsubmit="return confirm('Change whether this detail appears on the staff return form?');">
+            <button class="btn secondary small" type="submit">{% if f.is_active == 'Yes' %}Remove from Form{% else %}Restore{% endif %}</button>
+          </form>
+        </td>
+      </tr>
+    {% endfor %}
+  </table>
+
+  <h3>Additional Staff Return Details Set by HR</h3>
+  <table>
+    <tr><th>Order</th><th>Detail</th><th>Type</th><th>Required</th><th>Active</th><th>Options</th><th>Action</th></tr>
+    {% for f in fields %}<tr><td>{{ f.display_order }}</td><td>{{ f.field_label }}<br><small>{{ f.section }}</small></td><td>{{ f.field_type }}</td><td>{{ f.is_required }}</td><td>{{ f.is_active }}</td><td>{{ f.options }}</td><td><a class="btn small" href="{{ url_for('edit_staff_return_detail', field_id=f.id) }}">Edit</a><form method="post" action="{{ url_for('delete_staff_return_detail', field_id=f.id) }}" style="display:inline" onsubmit="return confirm('Delete this staff return detail? Existing answers for this detail will also be removed.');"><button class="btn danger small" type="submit">Delete</button></form></td></tr>{% else %}<tr><td colspan="7">No extra staff return details have been added yet.</td></tr>{% endfor %}
+  </table>
+</section>
+{% endblock %}

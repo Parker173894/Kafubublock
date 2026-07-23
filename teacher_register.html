@@ -1,0 +1,65 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="page">
+  <h2>New Subject Teacher Registration</h2>
+  <p class="note">This section is only for HODs. Create an individual username and temporary password for each new Subject Teacher. The teacher will use them on the separate Teacher Login page.</p>
+  <form method="post" enctype="multipart/form-data" class="form-card wide">
+    <h3>Portal Account</h3>
+    <label>Teacher's Individual Username</label><input name="username" required autocomplete="off" placeholder="Example: mr_mwamba">
+    <label>Temporary Teacher Password</label><input id="teacherPassword" name="password" type="password" minlength="8" required autocomplete="new-password" placeholder="At least 8 characters, capital letter, small letter and number">
+    <label>Confirm Temporary Password</label><input id="teacherPasswordConfirm" name="confirm_password" type="password" minlength="8" required autocomplete="new-password">
+    <div class="portal-actions">
+      <button class="btn secondary" type="button" id="generateTeacherPassword">Generate Strong Temporary Password</button>
+      <label><input type="checkbox" id="showTeacherPassword"> Show password</label>
+    </div>
+    <p class="note">Write down the temporary password and give it privately to the teacher. The teacher must create a new private password at first login.</p>
+
+    <h3>Teacher Profile Details</h3>
+    <label>Full Name</label><input name="full_name" required>
+    <label>Position / Responsibility</label><input name="position" value="Subject Teacher">
+    <label>Department Assigned Automatically</label>
+    <div class="department-assignment-card">
+      <span class="department-assignment-icon">✓</span>
+      <div><strong>{{ DEPARTMENTS[hod_department] }}</strong><p>This teacher will be recorded immediately under your department and shown on its staff page.</p></div>
+    </div>
+    <label>Subjects Taught</label><input name="subjects_taught" placeholder="Example: Mathematics, Biology">
+    <label>Phone</label><input name="phone">
+    <label>Email</label><input name="email" type="email">
+    <label>Qualification</label><input name="qualification" placeholder="Example: Diploma, Degree, Masters">
+    <label>Address</label><input name="address">
+    <label>Short Profile / Bio</label><textarea name="bio" placeholder="Briefly describe teaching experience, subjects and responsibilities"></textarea>
+    <label>Upload Profile Picture</label><input type="file" name="profile_picture" accept="image/*">
+    <button class="btn">Create Teacher Account</button><a class="btn secondary" href="{{ url_for('dashboard') }}">Back to Dashboard</a>
+  </form>
+</section>
+<script>
+  const passwordField = document.getElementById('teacherPassword');
+  const confirmationField = document.getElementById('teacherPasswordConfirm');
+  document.getElementById('generateTeacherPassword').addEventListener('click', () => {
+    const capitals = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+    const small = 'abcdefghijkmnopqrstuvwxyz';
+    const numbers = '23456789';
+    const all = capitals + small + numbers;
+    const secureIndex = (length) => crypto.getRandomValues(new Uint32Array(1))[0] % length;
+    const randomCharacter = (characters) => characters[secureIndex(characters.length)];
+    let password = randomCharacter(capitals) + randomCharacter(small) + randomCharacter(numbers);
+    for (let i = 0; i < 9; i += 1) password += randomCharacter(all);
+    const characters = password.split('');
+    for (let i = characters.length - 1; i > 0; i -= 1) {
+      const j = secureIndex(i + 1);
+      [characters[i], characters[j]] = [characters[j], characters[i]];
+    }
+    password = characters.join('');
+    passwordField.value = password;
+    confirmationField.value = password;
+    passwordField.type = 'text';
+    confirmationField.type = 'text';
+    document.getElementById('showTeacherPassword').checked = true;
+  });
+  document.getElementById('showTeacherPassword').addEventListener('change', (event) => {
+    const type = event.target.checked ? 'text' : 'password';
+    passwordField.type = type;
+    confirmationField.type = type;
+  });
+</script>
+{% endblock %}

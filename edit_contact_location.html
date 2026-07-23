@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+{% block title %}Edit Contact and Location{% endblock %}
+{% block content %}
+<section class="page">
+  <h2>Edit School Contact and Location</h2>
+  <p class="hint">This page is for the Headteacher to update the public contact details and Google Map location shown under Enquiries.</p>
+
+  <form method="post" class="form-card">
+    <label>School Phone Number</label>
+    <input type="text" name="contact_phone" value="{{ content.contact_phone }}" placeholder="Example: +260 9XX XXX XXX">
+
+    <label>School Email Address</label>
+    <input type="email" name="contact_email" value="{{ content.contact_email }}" placeholder="Example: info@kafubublock.edu.zm">
+
+    <label>Office Hours</label>
+    <input type="text" name="office_hours" value="{{ content.office_hours }}" placeholder="Example: Monday to Friday, 07:30 - 16:30">
+
+    <label>School Location / Physical Address</label>
+    <textarea name="school_location" rows="3" placeholder="Enter the school location or address">{{ content.school_location }}</textarea>
+
+    <label>Google Map Search Location</label>
+    <input type="text" name="map_query" value="{{ content.map_query }}" placeholder="Example: Kafubu Block Secondary School, Zambia">
+    <small class="hint">This is the text Google Maps will use to locate the school. You can use the school name, area, district and country.</small>
+
+    <label>Contact Page Message</label>
+    <textarea name="contact_message" rows="4" placeholder="Short message shown at the top of the contact page">{{ content.contact_message }}</textarea>
+
+    <button class="btn" type="submit">Save Contact Details</button>
+    <a class="btn secondary" href="{{ url_for('contact_location') }}">Cancel</a>
+  </form>
+</section>
+{% endblock %}

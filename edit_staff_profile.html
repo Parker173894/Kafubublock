@@ -1,0 +1,65 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="page">
+  <h2>Edit Staff Profile</h2>
+  <p class="note">This page allows authorised HODs, the Deputy Headteacher, the Headteacher and HR to update staff profile details and profile pictures.</p>
+
+  <div class="profile small">
+    {% if staff.profile_picture %}
+      <img class="avatar-img" src="{{ url_for('profile_picture', filename=staff.profile_picture) }}" alt="Profile picture">
+    {% else %}
+      <div class="avatar">{{ staff.full_name[:1] }}</div>
+    {% endif %}
+    <div>
+      <h3>{{ staff.full_name }}</h3>
+      <p>{{ staff.position }}</p>
+      <p>{% if staff.department %}{{ DEPARTMENTS[staff.department] }}{% else %}Not assigned to a department{% endif %}</p>
+    </div>
+  </div>
+
+  <form method="post" enctype="multipart/form-data" class="form-card wide">
+    <label>Full Name</label>
+    <input name="full_name" value="{{ staff.full_name }}" required>
+
+    <label>Position / Responsibility</label>
+    <input name="position" value="{{ staff.position or ('Head of Department' if staff.role.startswith('hod_') else 'Subject Teacher') }}" required>
+
+    <label>Department</label>
+    {% if staff.role.startswith('hod_') %}
+      <input value="{{ DEPARTMENTS[staff.department] if staff.department else 'HOD Department' }}" disabled>
+      <small>HOD department is controlled by the HOD account role.</small>
+    {% elif session.role in STAFF_MANAGEMENT_FULL_ROLES %}
+      <select name="department" required>
+        <option value="">Select Department</option>
+        {% for key,name in DEPARTMENTS.items() %}
+          <option value="{{ key }}" {% if staff.department == key %}selected{% endif %}>{{ name }}</option>
+        {% endfor %}
+      </select>
+    {% else %}
+      <input value="{{ DEPARTMENTS[staff.department] if staff.department else 'Your Department' }}" disabled>
+      <small>HODs can edit only Subject Teachers within their own department.</small>
+    {% endif %}
+
+    <label>Phone</label>
+    <input name="phone" value="{{ staff.phone or '' }}">
+
+    <label>Email</label>
+    <input name="email" type="email" value="{{ staff.email or '' }}">
+
+    <label>Qualification</label>
+    <input name="qualification" value="{{ staff.qualification or '' }}">
+
+    <label>Address</label>
+    <input name="address" value="{{ staff.address or '' }}">
+
+    <label>Short Profile / Bio</label>
+    <textarea name="bio">{{ staff.bio or '' }}</textarea>
+
+    <label>Upload / Change Profile Picture</label>
+    <input type="file" name="profile_picture" accept="image/*">
+
+    <button class="btn">Save Changes</button>
+    <a class="btn secondary" href="{{ url_for('manage_subject_teachers') }}">Cancel</a>
+  </form>
+</section>
+{% endblock %}

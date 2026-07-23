@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="page">
+  <h2>Update My Profile</h2>
+  {% if user.role in ['teacher','guidance_counselling'] %}
+    <p class="note">This is your individual teacher profile. Update your details and profile picture below. Use Change Password in the top menu whenever you know your current password.</p>
+  {% else %}
+    <p class="note">Subject teachers should select their department here. Once saved, the profile will appear under that department page.</p>
+  {% endif %}
+
+  <div class="profile small">
+    {% if user.profile_picture %}<img class="avatar-img" src="{{ url_for('profile_picture', filename=user.profile_picture) }}" alt="Profile picture">{% else %}<div class="avatar">{{ user.full_name[:1] }}</div>{% endif %}
+    <div><h3>{{ user.full_name }}</h3><p>{{ user.position }}</p><p>{% if user.department %}{{ DEPARTMENTS[user.department] }}{% else %}School Administration / Not assigned to a department{% endif %}</p></div>
+  </div>
+
+  <form method="post" enctype="multipart/form-data" class="form-card wide">
+    <label>Full Name</label><input name="full_name" value="{{ user.full_name }}" required>
+    <label>Position / Responsibility</label><input name="position" value="{{ user.position or '' }}" placeholder="Example: Mathematics Subject Teacher, Head Teacher, HR Officer">
+    <label>Department</label>
+    {% if user.role in ['student'] %}<input value="Pupil" disabled>
+    {% elif user.role.startswith('hod_') %}<input value="{{ DEPARTMENTS[user.department] }}" disabled><small>HOD department is fixed according to the HOD account.</small>
+    {% elif user.role == 'teacher' %}<input value="{{ DEPARTMENTS.get(user.department, 'Not assigned') }}" disabled><small>Your HOD assigned this department. Saving your profile automatically updates your staff record on the department page.</small>{% if user.department %}<a class="mini-btn" href="{{ url_for('department_detail', dept=user.department) }}">View My Department Profile</a>{% endif %}
+    {% else %}<select name="department"><option value="">School Administration / Not assigned</option>{% for key,name in DEPARTMENTS.items() %}<option value="{{ key }}" {% if user.department == key %}selected{% endif %}>{{ name }}</option>{% endfor %}</select>{% endif %}
+    <label>Phone</label><input name="phone" value="{{ user.phone or '' }}">
+    <label>Email</label><input name="email" type="email" value="{{ user.email or '' }}">
+    <label>Qualification</label><input name="qualification" value="{{ user.qualification or '' }}" placeholder="Example: Diploma, Degree, Masters">
+    <label>Address</label><input name="address" value="{{ user.address or '' }}">
+    <label>Short Profile / Bio</label><textarea name="bio">{{ user.bio or '' }}</textarea>
+    <label>Upload Profile Picture</label><input type="file" name="profile_picture" accept="image/*">
+    {% if user.role in ['teacher','guidance_counselling'] %}<div class="notice"><b>Individual account:</b> These details belong to your own teacher login. For a forgotten password, ask the Headteacher or HR to reset it.</div><button class="btn">Save My Teacher Profile</button>
+    {% elif user.role != 'student' %}<h3>Portal Password</h3><p class="note">Leave these password fields blank if you do not want to change your portal password.</p><label>Current Portal Password</label><input name="current_password" type="password" placeholder="Enter current password"><label>New Portal Password</label><input name="new_password" type="password" placeholder="Enter new password"><label>Confirm New Password</label><input name="confirm_password" type="password" placeholder="Repeat new password"><button class="btn">Save Profile and Password</button>
+    {% else %}<p class="note">Pupil password changing has been disabled by the school portal.</p><button class="btn">Save Profile</button>{% endif %}
+  </form>
+</section>
+{% endblock %}

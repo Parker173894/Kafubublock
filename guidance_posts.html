@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="page">
+  <h2>Guidance and Counselling Posts / Videos</h2>
+  <p class="note">This public section allows learners, parents, guardians and visitors to access guidance lessons, counselling messages, study tips, career guidance, discipline talks and wellness information without logging in.</p>
+
+  {% if session.role in ['guidance_counselling','headteacher','deputy_headteacher','hr'] %}
+    <p><a class="btn" href="{{ url_for('upload_guidance_post') }}">Upload New Guidance Post / Video</a></p>
+  {% endif %}
+
+  <div class="cards">
+    {% for post in posts %}
+      <div class="card guidance-card">
+        <h3>{{ post.title }}</h3>
+        <p><span class="badge">{{ post.category }}</span></p>
+        <p>{{ post.message }}</p>
+        {% if post.video_filename %}
+          <video controls class="video-box">
+            <source src="{{ url_for('guidance_video', filename=post.video_filename) }}">
+            Your browser does not support video playback.
+          </video>
+        {% endif %}
+        <p class="muted">Posted by {{ post.posted_by }} on {{ post.posted_at }}</p>
+        {% if session.role in ['headteacher','deputy_headteacher','hr'] or (session.role == 'guidance_counselling' and post.posted_by == session.full_name) %}
+          <form method="post" action="{{ url_for('delete_guidance_post', post_id=post.id) }}" onsubmit="return confirm('Delete this guidance post?');">
+            <button class="mini-btn danger" type="submit">Delete Post</button>
+          </form>
+        {% endif %}
+      </div>
+    {% else %}
+      <div class="card"><p>No guidance and counselling posts have been uploaded yet.</p></div>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}

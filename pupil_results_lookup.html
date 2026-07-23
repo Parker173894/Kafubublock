@@ -1,0 +1,66 @@
+{% extends 'base.html' %}
+{% block title %}Check Pupil Results | Kafubu Block Secondary School{% endblock %}
+{% block content %}
+<section class="page pupil-results-page">
+  <div class="section-heading pupil-results-heading">
+    <span class="eyebrow dark">Pupils portal</span>
+    <h2>Check Your Results</h2>
+    <p>Enter your student number and full name exactly as registered by the school.</p>
+  </div>
+
+  {% if portal_open %}
+    <form method="post" class="form-card pupil-results-form">
+      <h3>Pupil identification</h3>
+      <p class="hint">Both details must belong to the same registered pupil.</p>
+
+      <label for="student_number">Student Number</label>
+      <input id="student_number" name="student_number" maxlength="40" required
+             value="{{ request.form.get('student_number', '') }}" autocomplete="off"
+             placeholder="Enter your student number">
+
+      <label for="full_name">Full Registered Name</label>
+      <input id="full_name" name="full_name" maxlength="150" required
+             value="{{ request.form.get('full_name', '') }}" autocomplete="name"
+             placeholder="Enter your full name">
+
+      <button class="btn" type="submit">View My Results</button>
+      <p class="pupil-privacy-note">For your privacy, do not leave your results open on a shared device.</p>
+    </form>
+  {% else %}
+    <div class="card portal-closed-card">
+      <h3>Results portal currently closed</h3>
+      <p>School management has not opened pupil result viewing. Please check again later.</p>
+    </div>
+  {% endif %}
+
+  {% if student %}
+    <article class="card pupil-result-identity" aria-live="polite">
+      <div>
+        <span class="eyebrow dark">Verified pupil</span>
+        <h3>{{ student.full_name }}</h3>
+      </div>
+      <div class="pupil-result-meta">
+        <p><b>Student Number</b><span>{{ student.student_number }}</span></p>
+        <p><b>Grade/Form</b><span>{{ student.grade }}</span></p>
+        <p><b>Class</b><span>{{ student.class_name }}</span></p>
+        <p><b>Class Teacher</b><span>{{ student.class_teacher or 'Not assigned' }}</span></p>
+      </div>
+    </article>
+
+    <div class="result-table-wrap">
+      <table>
+        <thead>
+          <tr><th>Subject</th><th>Term</th><th>Year</th><th>Test 1</th><th>Test 2</th><th>End Term</th><th>Total</th><th>Average</th><th>Comment</th></tr>
+        </thead>
+        <tbody>
+          {% for r in results %}
+            <tr><td>{{ r.subject }}</td><td>{{ r.term }}</td><td>{{ r.academic_year }}</td><td>{{ r.test1 }}</td><td>{{ r.test2 }}</td><td>{{ r.end_term }}</td><td>{{ r.total }}</td><td>{{ r.average }}</td><td>{{ r.comment }}</td></tr>
+          {% else %}
+            <tr><td colspan="9">No results have been uploaded for this pupil yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+</section>
+{% endblock %}

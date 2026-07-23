@@ -1,0 +1,19 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="auth">
+  <form method="post" class="form-card wide-card">
+    <h2>Teacher Login</h2>
+    <p class="hint">Use the individual username and temporary password created for you by your HOD. After login, you can view and update your teacher profile.</p>
+
+    <label>Teacher Username</label>
+    <input name="username" required autocomplete="username" placeholder="Enter your own username">
+
+    <label>Teacher Password</label>
+    <input name="password" type="password" required autocomplete="current-password" placeholder="Enter your own password">
+
+    <button class="btn" type="submit">Open My Teacher Profile</button>
+    <a class="btn secondary" href="{{ url_for('login') }}">Admin Login</a>
+    <p class="note">If you forget your password, ask the Headteacher or HR to reset it.</p>
+  </form>
+</section>
+{% endblock %}

@@ -1,0 +1,149 @@
+{% extends 'base.html' %}
+{% block title %}HR Teacher and Pupil Records | Kafubu Block Secondary School{% endblock %}
+{% block content %}
+<section class="page">
+  <div class="section-heading">
+    <span class="eyebrow dark">Human Resources</span>
+    <h2>Teacher and Pupil Records</h2>
+    <p>View current teaching-staff and pupil totals. HR can also update a pupil’s current grade, class and class teacher when the pupil is promoted or transferred.</p>
+  </div>
+
+  <div class="cards four hr-record-stats">
+    <div class="card stat"><h3>{{ subject_teacher_count }}</h3><p>Active Subject Teachers</p></div>
+    <div class="card stat"><h3>{{ hod_count }}</h3><p>Active HODs</p></div>
+    <div class="card stat"><h3>{{ teaching_staff_count }}</h3><p>Total Teaching Staff</p></div>
+    <div class="card stat"><h3>{{ pupil_count }}</h3><p>Total Registered Pupils</p></div>
+  </div>
+
+  <div class="hr-summary-grid">
+    <div>
+      <h3>Teaching Staff by Department</h3>
+      <div class="table-wrap">
+        <table>
+          <tr><th>Department</th><th>Subject Teachers</th><th>HODs</th><th>Total</th></tr>
+          {% for d in teacher_department_summary %}
+            <tr><td>{{ DEPARTMENTS.get(d.department, d.department or 'Not assigned') }}</td><td>{{ d.subject_teachers }}</td><td>{{ d.hods }}</td><td>{{ d.total }}</td></tr>
+          {% else %}<tr><td colspan="4">No active teaching staff recorded.</td></tr>{% endfor %}
+        </table>
+      </div>
+    </div>
+    <div>
+      <h3>Pupils by Grade/Form</h3>
+      <div class="table-wrap">
+        <table>
+          <tr><th>Grade/Form</th><th>Total Pupils</th><th>Open Records</th></tr>
+          {% for g in pupil_grade_summary %}
+            <tr><td>{{ g.grade }}</td><td>{{ g.total }}</td><td><a class="mini-btn" href="{{ url_for('hr_records', grade=g.grade) }}">Show All Pupils</a></td></tr>
+          {% else %}<tr><td colspan="3">No pupils recorded.</td></tr>{% endfor %}
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <h3>Find a Pupil</h3>
+  <form method="get" class="form-card wide hr-record-filter">
+    <div>
+      <label for="q">Student Number, Name or Class</label>
+      <input id="q" name="q" value="{{ search }}" placeholder="Search pupil records">
+    </div>
+    <div>
+      <label for="grade">Grade/Form</label>
+      <select id="grade" name="grade">
+        <option value="">All Grades / Forms</option>
+        {% for g in GRADES %}<option value="{{ g }}" {% if selected_grade == g %}selected{% endif %}>{{ g }}</option>{% endfor %}
+      </select>
+    </div>
+    <button class="btn" type="submit">Search Records</button>
+    <a class="btn secondary" href="{{ url_for('hr_records') }}">Clear</a>
+  </form>
+
+  <h3>Pupil Grade and Class Records</h3>
+  {% if selected_grade %}
+    <p class="notice success"><b>{{ selected_grade }} selected:</b> All {{ pupils|length }} matching pupils in this grade are displayed below.</p>
+  {% endif %}
+  {% if session.role == 'hr' %}
+    <p class="notice"><b>HR grade changes:</b> Select the new grade/form and enter the new class. Existing results remain under the grade in which they were earned.</p>
+  {% else %}
+    <p class="notice">This is a read-only view. Only HR can change a pupil’s current grade or class.</p>
+  {% endif %}
+
+  {% if session.role == 'hr' and selected_grade %}
+    <div class="card bulk-grade-card">
+      <span class="eyebrow dark">Bulk grade change</span>
+      <h3>Change All Pupils in {{ selected_grade }}</h3>
+      <p>This will update every pupil currently shown in <b>{{ selected_grade }}</b>. Leave the class or class-teacher fields blank to keep each pupil’s existing value.</p>
+      <form method="post" action="{{ url_for('hr_change_grade_bulk') }}" class="bulk-grade-form" onsubmit="return confirm('Change every pupil currently registered in {{ selected_grade }}?');">
+        <input type="hidden" name="current_grade" value="{{ selected_grade }}">
+        <div>
+          <label for="new_grade">New Grade/Form for All</label>
+          <select id="new_grade" name="new_grade" required>
+            <option value="">Choose New Grade/Form</option>
+            {% for g in GRADES %}<option value="{{ g }}">{{ g }}</option>{% endfor %}
+          </select>
+        </div>
+        <div>
+          <label for="new_class">New Class for All — Optional</label>
+          <input id="new_class" name="new_class" maxlength="40" placeholder="Blank keeps each current class">
+        </div>
+        <div>
+          <label for="new_class_teacher">New Class Teacher for All — Optional</label>
+          <input id="new_class_teacher" name="new_class_teacher" maxlength="150" placeholder="Blank keeps each current teacher">
+        </div>
+        <div>
+          <label for="confirmation">Type CHANGE ALL to Confirm</label>
+          <input id="confirmation" name="confirmation" required autocomplete="off" placeholder="CHANGE ALL">
+        </div>
+        <button class="btn danger" type="submit">Change All {{ pupils|length }} Pupils</button>
+      </form>
+      <p class="hint">If the grade has different classes such as A and B, leave “New Class for All” blank and update classes individually where needed.</p>
+    </div>
+  {% endif %}
+
+  <div class="table-wrap">
+    <table>
+      <tr><th>Pupil No.</th><th>Full Name</th><th>Current Grade</th><th>Current Class</th><th>Class Teacher</th>{% if session.role == 'hr' %}<th>Change Grade / Class</th>{% endif %}</tr>
+      {% for s in pupils %}
+        <tr>
+          <td>{{ s.student_number }}</td>
+          <td>{{ s.full_name }}</td>
+          <td>{{ s.grade }}</td>
+          <td>{{ s.class_name }}</td>
+          <td>{{ s.class_teacher or 'Not assigned' }}</td>
+          {% if session.role == 'hr' %}
+            <td>
+              <form method="post" action="{{ url_for('hr_change_pupil_grade', student_id=s.id) }}" class="grade-change-form" onsubmit="return confirm('Save this pupil grade and class change?');">
+                <input type="hidden" name="return_q" value="{{ search }}">
+                <input type="hidden" name="return_grade" value="{{ selected_grade }}">
+                <select name="grade" aria-label="New grade for {{ s.full_name }}" required>
+                  {% for g in GRADES %}<option value="{{ g }}" {% if s.grade == g %}selected{% endif %}>{{ g }}</option>{% endfor %}
+                </select>
+                <input name="class_name" value="{{ s.class_name }}" maxlength="40" required aria-label="New class for {{ s.full_name }}" placeholder="New class">
+                <input name="class_teacher" value="{{ s.class_teacher or '' }}" maxlength="150" aria-label="Class teacher for {{ s.full_name }}" placeholder="Class teacher">
+                <button class="mini-btn" type="submit">Save Change</button>
+              </form>
+            </td>
+          {% endif %}
+        </tr>
+      {% else %}
+        <tr><td colspan="{% if session.role == 'hr' %}6{% else %}5{% endif %}">No pupils matched the selected search.</td></tr>
+      {% endfor %}
+    </table>
+  </div>
+
+  <h3>Recent Grade Changes</h3>
+  <div class="table-wrap">
+    <table>
+      <tr><th>Date</th><th>Pupil</th><th>Previous Grade / Class</th><th>New Grade / Class</th><th>Changed By</th></tr>
+      {% for change in recent_grade_changes %}
+        <tr>
+          <td>{{ change.changed_at }}</td>
+          <td>{{ change.student_number }} — {{ change.student_name }}</td>
+          <td>{{ change.previous_grade }} {{ change.previous_class }}</td>
+          <td>{{ change.new_grade }} {{ change.new_class }}</td>
+          <td>{{ change.changed_by }}</td>
+        </tr>
+      {% else %}<tr><td colspan="5">No pupil grade changes have been recorded yet.</td></tr>{% endfor %}
+    </table>
+  </div>
+</section>
+{% endblock %}

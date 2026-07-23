@@ -1,0 +1,16 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="page">
+  <h2>Edit Standard Staff Return Detail</h2>
+  <p>HR can rename this detail, make it required, or remove it from the teachers' staff return form by setting it inactive.</p>
+  <form method="post" class="form-card wide">
+    <label>Detail Name / Label<input name="field_label" value="{{ field.field_label }}" required></label>
+    <label>Section<input name="section" value="{{ field.section }}" required></label>
+    <label>Required?<select name="is_required"><option value="Yes" {% if field.is_required=='Yes' %}selected{% endif %}>Yes</option><option value="No" {% if field.is_required=='No' %}selected{% endif %}>No</option></select></label>
+    <label>Show on Staff Return Form?<select name="is_active"><option value="Yes" {% if field.is_active=='Yes' %}selected{% endif %}>Yes</option><option value="No" {% if field.is_active=='No' %}selected{% endif %}>No - Remove from form</option></select></label>
+    <label>Display Order<input type="number" name="display_order" value="{{ field.display_order }}" min="1"></label>
+    <button class="btn" type="submit">Save Changes</button>
+    <a class="btn secondary" href="{{ url_for('manage_staff_return_details') }}">Back</a>
+  </form>
+</section>
+{% endblock %}

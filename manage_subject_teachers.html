@@ -1,0 +1,47 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="page">
+  <h2>{{ page_title }}</h2>
+  <p class="note">Department access: <b>{{ dept_name }}</b>. HODs can manage Subject Teachers under their own department. The Deputy Headteacher, Headteacher and HR can manage all HOD and Subject Teacher profiles.</p>
+
+  <table>
+    <tr>
+      <th>Photo</th>
+      <th>Name</th>
+      <th>Role</th>
+      <th>Department</th>
+      <th>Phone</th>
+      <th>Email</th>
+      <th>Qualification</th>
+      <th>Actions</th>
+    </tr>
+    {% for t in teachers %}
+      <tr>
+        <td>
+          {% if t.profile_picture %}
+            <img class="table-avatar" src="{{ url_for('profile_picture', filename=t.profile_picture) }}" alt="Profile picture">
+          {% else %}
+            <span class="avatar mini">{{ t.full_name[:1] }}</span>
+          {% endif %}
+        </td>
+        <td><b>{{ t.full_name }}</b><br><small>{{ t.position }}</small></td>
+        <td>{% if t.role.startswith('hod_') %}HOD{% elif t.role == 'teacher' %}Subject Teacher{% else %}{{ t.role }}{% endif %}</td>
+        <td>{% if t.department %}{{ DEPARTMENTS[t.department] }}{% else %}Not assigned{% endif %}</td>
+        <td>{{ t.phone or '' }}</td>
+        <td>{{ t.email or '' }}</td>
+        <td>{{ t.qualification or '' }}</td>
+        <td>
+          <a class="btn small" href="{{ url_for('edit_staff_profile', user_id=t.id) }}">Edit</a>
+          <form method="post" action="{{ url_for('delete_staff_profile', user_id=t.id) }}" style="display:inline" onsubmit="return confirm('Are you sure you want to delete this staff profile?');">
+            <button class="btn danger small" type="submit">Delete</button>
+          </form>
+        </td>
+      </tr>
+    {% else %}
+      <tr><td colspan="8">No HOD or Subject Teacher profiles found for this access level.</td></tr>
+    {% endfor %}
+  </table>
+
+  <p><a class="btn secondary" href="{{ url_for('dashboard') }}">Back to Dashboard</a></p>
+</section>
+{% endblock %}

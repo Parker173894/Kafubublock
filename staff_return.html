@@ -1,0 +1,189 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="page">
+  <h2>{% if edit_mode %}Edit Staff Return Details{% else %}Staff Return Registration{% endif %}</h2>
+  {% if edit_mode %}
+    <p>HR is editing staff return details for <strong>{{ target_name }}</strong>.</p>
+  {% else %}
+    <p>Complete or update your staff details for HR staff return records.</p>
+  {% endif %}
+
+  <form method="post" class="form-card wide">
+    {% set keys = core_field_keys or [] %}
+    {% set labels = core_labels or {} %}
+    {% set req = core_required or {} %}
+
+    {% set personal = ['full_name','employee_number','nrc_number','gender','date_of_birth','phone','email','address'] %}
+    <h3>Personal Details</h3>
+    <div class="grid two">
+      {% if 'full_name' in keys %}
+      <label>{{ labels.get('full_name','Full Name') }}{% if req.get('full_name') %} <span class="required">*</span>{% endif %}
+        <input name="full_name" value="{{ staff_return.full_name if staff_return else user.full_name }}" {% if req.get('full_name') %}required{% endif %}>
+      </label>
+      {% endif %}
+      {% if 'employee_number' in keys %}
+      <label>{{ labels.get('employee_number','Employee / Staff Number') }}{% if req.get('employee_number') %} <span class="required">*</span>{% endif %}
+        <input name="employee_number" value="{{ staff_return.employee_number if staff_return else '' }}" {% if req.get('employee_number') %}required{% endif %}>
+      </label>
+      {% endif %}
+      {% if 'nrc_number' in keys %}
+      <label>{{ labels.get('nrc_number','NRC Number') }}{% if req.get('nrc_number') %} <span class="required">*</span>{% endif %}
+        <input name="nrc_number" value="{{ staff_return.nrc_number if staff_return else '' }}" {% if req.get('nrc_number') %}required{% endif %}>
+      </label>
+      {% endif %}
+      {% if 'gender' in keys %}
+      <label>{{ labels.get('gender','Gender') }}{% if req.get('gender') %} <span class="required">*</span>{% endif %}
+        <select name="gender" {% if req.get('gender') %}required{% endif %}>
+          {% set gender = staff_return.gender if staff_return else '' %}
+          <option value="">Select Gender</option>
+          <option value="Male" {% if gender=='Male' %}selected{% endif %}>Male</option>
+          <option value="Female" {% if gender=='Female' %}selected{% endif %}>Female</option>
+        </select>
+      </label>
+      {% endif %}
+      {% if 'date_of_birth' in keys %}
+      <label>{{ labels.get('date_of_birth','Date of Birth') }}{% if req.get('date_of_birth') %} <span class="required">*</span>{% endif %}
+        <input type="date" name="date_of_birth" value="{{ staff_return.date_of_birth if staff_return else '' }}" {% if req.get('date_of_birth') %}required{% endif %}>
+      </label>
+      {% endif %}
+      {% if 'phone' in keys %}
+      <label>{{ labels.get('phone','Phone Number') }}{% if req.get('phone') %} <span class="required">*</span>{% endif %}
+        <input name="phone" value="{{ staff_return.phone if staff_return else user.phone }}" {% if req.get('phone') %}required{% endif %}>
+      </label>
+      {% endif %}
+      {% if 'email' in keys %}
+      <label>{{ labels.get('email','Email Address') }}{% if req.get('email') %} <span class="required">*</span>{% endif %}
+        <input type="email" name="email" value="{{ staff_return.email if staff_return else user.email }}" {% if req.get('email') %}required{% endif %}>
+      </label>
+      {% endif %}
+      {% if 'address' in keys %}
+      <label>{{ labels.get('address','Residential Address') }}{% if req.get('address') %} <span class="required">*</span>{% endif %}
+        <input name="address" value="{{ staff_return.address if staff_return else user.address }}" {% if req.get('address') %}required{% endif %}>
+      </label>
+      {% endif %}
+    </div>
+
+    {% set employment = ['position','department','subjects_taught','classes_taught','highest_qualification','professional_qualification','years_experience','employment_status','date_first_appointed','date_joined_school','tsc_number'] %}
+    <h3>Employment Details</h3>
+    <div class="grid two">
+      {% if 'position' in keys %}
+      <label>{{ labels.get('position','Position') }}{% if req.get('position') %} <span class="required">*</span>{% endif %}
+        <input name="position" value="{{ staff_return.position if staff_return else user.position }}" {% if req.get('position') %}required{% endif %}>
+      </label>
+      {% endif %}
+      {% if 'department' in keys %}
+      <label>{{ labels.get('department','Department') }}{% if req.get('department') %} <span class="required">*</span>{% endif %}
+        {% set dept = staff_return.department if staff_return else user.department %}
+        <select name="department" {% if req.get('department') %}required{% endif %}>
+          <option value="">Select Department</option>
+          {% for key, name in DEPARTMENTS.items() %}
+            <option value="{{ key }}" {% if dept==key %}selected{% endif %}>{{ name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      {% endif %}
+      {% if 'subjects_taught' in keys %}
+      <label>{{ labels.get('subjects_taught','Subjects Taught') }}{% if req.get('subjects_taught') %} <span class="required">*</span>{% endif %}
+        <input name="subjects_taught" placeholder="e.g. Mathematics, Biology" value="{{ staff_return.subjects_taught if staff_return else '' }}" {% if req.get('subjects_taught') %}required{% endif %}>
+      </label>
+      {% endif %}
+      {% if 'classes_taught' in keys %}
+      <label>{{ labels.get('classes_taught','Classes Taught') }}{% if req.get('classes_taught') %} <span class="required">*</span>{% endif %}
+        <input name="classes_taught" placeholder="e.g. Form 1, Grade 10, Grade 12" value="{{ staff_return.classes_taught if staff_return else '' }}" {% if req.get('classes_taught') %}required{% endif %}>
+      </label>
+      {% endif %}
+      {% if 'highest_qualification' in keys %}
+      <label>{{ labels.get('highest_qualification','Highest Academic Qualification') }}{% if req.get('highest_qualification') %} <span class="required">*</span>{% endif %}
+        <input name="highest_qualification" value="{{ staff_return.highest_qualification if staff_return else user.qualification }}" {% if req.get('highest_qualification') %}required{% endif %}>
+      </label>
+      {% endif %}
+      {% if 'professional_qualification' in keys %}
+      <label>{{ labels.get('professional_qualification','Professional Qualification') }}{% if req.get('professional_qualification') %} <span class="required">*</span>{% endif %}
+        <input name="professional_qualification" value="{{ staff_return.professional_qualification if staff_return else '' }}" {% if req.get('professional_qualification') %}required{% endif %}>
+      </label>
+      {% endif %}
+      {% if 'years_experience' in keys %}
+      <label>{{ labels.get('years_experience','Years of Experience') }}{% if req.get('years_experience') %} <span class="required">*</span>{% endif %}
+        <input name="years_experience" value="{{ staff_return.years_experience if staff_return else '' }}" {% if req.get('years_experience') %}required{% endif %}>
+      </label>
+      {% endif %}
+      {% if 'employment_status' in keys %}
+      <label>{{ labels.get('employment_status','Employment Status') }}{% if req.get('employment_status') %} <span class="required">*</span>{% endif %}
+        {% set status = staff_return.employment_status if staff_return else '' %}
+        <select name="employment_status" {% if req.get('employment_status') %}required{% endif %}>
+          <option value="">Select Status</option>
+          <option value="Permanent" {% if status=='Permanent' %}selected{% endif %}>Permanent</option>
+          <option value="Contract" {% if status=='Contract' %}selected{% endif %}>Contract</option>
+          <option value="Part-time" {% if status=='Part-time' %}selected{% endif %}>Part-time</option>
+          <option value="Volunteer" {% if status=='Volunteer' %}selected{% endif %}>Volunteer</option>
+        </select>
+      </label>
+      {% endif %}
+      {% if 'date_first_appointed' in keys %}
+      <label>{{ labels.get('date_first_appointed','Date First Appointed') }}{% if req.get('date_first_appointed') %} <span class="required">*</span>{% endif %}
+        <input type="date" name="date_first_appointed" value="{{ staff_return.date_first_appointed if staff_return else '' }}" {% if req.get('date_first_appointed') %}required{% endif %}>
+      </label>
+      {% endif %}
+      {% if 'date_joined_school' in keys %}
+      <label>{{ labels.get('date_joined_school','Date Joined This School') }}{% if req.get('date_joined_school') %} <span class="required">*</span>{% endif %}
+        <input type="date" name="date_joined_school" value="{{ staff_return.date_joined_school if staff_return else '' }}" {% if req.get('date_joined_school') %}required{% endif %}>
+      </label>
+      {% endif %}
+      {% if 'tsc_number' in keys %}
+      <label>{{ labels.get('tsc_number','TSC / Professional Number') }}{% if req.get('tsc_number') %} <span class="required">*</span>{% endif %}
+        <input name="tsc_number" value="{{ staff_return.tsc_number if staff_return else '' }}" {% if req.get('tsc_number') %}required{% endif %}>
+      </label>
+      {% endif %}
+    </div>
+
+    {% set kin = ['next_of_kin','next_of_kin_phone'] %}
+    <h3>Next of Kin</h3>
+    <div class="grid two">
+      {% if 'next_of_kin' in keys %}
+      <label>{{ labels.get('next_of_kin','Next of Kin Name') }}{% if req.get('next_of_kin') %} <span class="required">*</span>{% endif %}
+        <input name="next_of_kin" value="{{ staff_return.next_of_kin if staff_return else '' }}" {% if req.get('next_of_kin') %}required{% endif %}>
+      </label>
+      {% endif %}
+      {% if 'next_of_kin_phone' in keys %}
+      <label>{{ labels.get('next_of_kin_phone','Next of Kin Phone') }}{% if req.get('next_of_kin_phone') %} <span class="required">*</span>{% endif %}
+        <input name="next_of_kin_phone" value="{{ staff_return.next_of_kin_phone if staff_return else '' }}" {% if req.get('next_of_kin_phone') %}required{% endif %}>
+      </label>
+      {% endif %}
+    </div>
+
+    {% if 'remarks' in keys %}
+    <label>{{ labels.get('remarks','Remarks') }}{% if req.get('remarks') %} <span class="required">*</span>{% endif %}
+      <textarea name="remarks" rows="3" {% if req.get('remarks') %}required{% endif %}>{{ staff_return.remarks if staff_return else '' }}</textarea>
+    </label>
+    {% endif %}
+
+    {% if custom_fields %}
+      <h3>Additional Details Required by HR</h3>
+      <p class="muted">These extra staff return details are set by HR. Complete all fields marked required.</p>
+      <div class="grid two">
+        {% for field in custom_fields %}
+          <label>{{ field.field_label }}{% if field.is_required == 'Yes' %} <span class="required">*</span>{% endif %}
+            {% set ans = custom_answers.get(field.id, '') %}
+            {% if field.field_type == 'textarea' %}
+              <textarea name="custom_{{ field.id }}" rows="3" {% if field.is_required == 'Yes' %}required{% endif %}>{{ ans }}</textarea>
+            {% elif field.field_type == 'select' %}
+              <select name="custom_{{ field.id }}" {% if field.is_required == 'Yes' %}required{% endif %}>
+                <option value="">Select</option>
+                {% for opt in (field.options or '').split(',') %}
+                  {% set clean = opt.strip() %}
+                  {% if clean %}<option value="{{ clean }}" {% if ans == clean %}selected{% endif %}>{{ clean }}</option>{% endif %}
+                {% endfor %}
+              </select>
+            {% else %}
+              <input type="{{ field.field_type if field.field_type in ['text','number','date','email'] else 'text' }}" name="custom_{{ field.id }}" value="{{ ans }}" {% if field.is_required == 'Yes' %}required{% endif %}>
+            {% endif %}
+          </label>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    <button class="btn" type="submit">{% if edit_mode %}Save HR Changes{% else %}Save Staff Return Details{% endif %}</button>
+    {% if edit_mode %}<a class="btn secondary" href="{{ url_for('staff_return_records') }}">Back to Staff Return Records</a>{% endif %}
+  </form>
+</section>
+{% endblock %}

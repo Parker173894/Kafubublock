@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+  <title>{% block title %}Kafubu Block Secondary School{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/modern.css') }}">
+</head>
+<body{% if active_backgrounds %} class="has-site-background"{% endif %}>
+  {% if active_backgrounds %}
+    <div id="siteBackgroundSlideshow" class="site-bg-slideshow">
+      {% for bg in active_backgrounds %}
+        <div class="site-bg-slide{% if loop.first %} active{% endif %}" style="background-image:url('{{ url_for('background_picture', filename=bg.filename) }}')"></div>
+      {% endfor %}
+    </div>
+    <div class="site-bg-overlay"></div>
+  {% endif %}
+
+  <header class="topbar site-header">
+    <div class="header-inner">
+    <a class="brand" href="{{ url_for('index') }}" aria-label="Kafubu Block Secondary School home"><div class="logo">KB</div><div><h1>Kafubu Block Secondary School</h1><p>Knowledge • Discipline • Service</p></div></a>
+    <button class="mobile-menu-button" type="button" aria-expanded="false" aria-controls="mainNavigation"><span></span><span></span><span></span><b>Menu</b></button>
+    <nav id="mainNavigation" class="main-navigation">
+      <a href="{{ url_for('index') }}">Home</a>
+      <a href="{{ url_for('about') }}">About</a>
+      <a href="{{ url_for('departments') }}">Departments</a>
+      <div class="nav-dropdown">
+        <button type="button" class="nav-dropbtn">Enquiries ▾</button>
+        <div class="nav-dropdown-content">
+          <a href="{{ url_for('school_calendar') }}">School Calendar</a>
+          <a href="{{ url_for('donor_needs') }}">Donor Needs</a>
+          <a href="{{ url_for('donate') }}">Donate</a>
+          <a href="{{ url_for('contact_location') }}">Contact & Location</a>
+        </div>
+      </div>
+      <a href="{{ url_for('leadership') }}">Profiles</a>
+      <a href="{{ url_for('guidance_posts') }}">Guidance & Counselling</a>
+      {% if session.get('user_id') %}<span class="nav-user">{{ session.get('full_name','User') }}</span><a href="{{ url_for('dashboard') }}">Portal</a>{% if session.get('role') == 'student' %}<a href="{{ url_for('my_registration') }}">Pupil Registration</a>{% else %}<a href="{{ url_for('profile') }}">My Profile</a>{% endif %}<a href="{{ url_for('change_password') }}">Change Password</a><a href="{{ url_for('logout') }}">Logout</a>{% else %}<a href="{{ url_for('pupil_results_lookup') }}">Pupil Results</a><a href="{{ url_for('teacher_login') }}">Teacher Login</a><a href="{{ url_for('login') }}" class="login-link">Admin Login</a>{% endif %}
+    </nav>
+    </div>
+  </header>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}{% if messages %}<section class="messages">{% for cat,msg in messages %}<div class="alert {{ cat }}">{{ msg }}</div>{% endfor %}</section>{% endif %}{% endwith %}
+
+  <main class="site-main">{% block content %}{% endblock %}</main>
+  <footer><div class="footer-inner"><div><strong>Kafubu Block Secondary School</strong><p>Knowledge, Discipline and Service</p></div><div><p>&copy; 2026 All Rights Reserved.</p><p>Supporting administration, teachers, learners, families and partners.</p></div></div></footer>
+
+  <script>
+    const menuButton = document.querySelector('.mobile-menu-button');
+    const mainNavigation = document.getElementById('mainNavigation');
+    if (menuButton && mainNavigation) {
+      menuButton.addEventListener('click', () => {
+        const open = mainNavigation.classList.toggle('is-open');
+        menuButton.setAttribute('aria-expanded', String(open));
+      });
+    }
+
+    // Add the server-generated CSRF token to every state-changing form.
+    document.querySelectorAll('form').forEach((form) => {
+      if ((form.method || 'get').toLowerCase() !== 'post' || form.querySelector('input[name="_csrf_token"]')) return;
+      const token = document.createElement('input');
+      token.type = 'hidden';
+      token.name = '_csrf_token';
+      token.value = {{ csrf_token()|tojson }};
+      form.appendChild(token);
+    });
+  </script>
+
+  {% if active_backgrounds|length > 1 %}
+  <script>
+    const slides = document.querySelectorAll('.site-bg-slide');
+    let activeSlide = 0;
+    const slideDuration = 15000; // change background picture after 15 seconds
+
+    function showNextBackgroundSlide() {
+      slides[activeSlide].classList.remove('active');
+      activeSlide = (activeSlide + 1) % slides.length;
+      slides[activeSlide].classList.add('active');
+    }
+
+    setInterval(showNextBackgroundSlide, slideDuration);
+  </script>
+  {% endif %}
+</body>
+</html>

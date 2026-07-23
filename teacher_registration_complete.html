@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="auth">
+  <div class="form-card wide-card">
+    <h2>Subject Teacher Account Created</h2>
+    <div class="notice success">{{ teacher_name }} now has an individual Subject Teacher portal account.</div>
+    <p><b>Teacher:</b> {{ teacher_name }}</p>
+    <p><b>Department:</b> {{ department_name }}</p>
+    <p><b>Teacher Login Page:</b> <a href="{{ url_for('teacher_login') }}">{{ url_for('teacher_login', _external=True) }}</a></p>
+    <p><b>Username:</b> <span class="credential-value">{{ teacher_username }}</span></p>
+    <p><b>Temporary Password:</b> <span class="credential-value">{{ temporary_password }}</span></p>
+    <div class="notice warning"><b>Private handoff:</b> Give these details only to the registered teacher. This temporary password is displayed on this page once, and the teacher must replace it at first login.</div>
+    <div class="notice success"><b>Department recorded:</b> The teacher has already been added to {{ department_name }}. Future profile edits will update the same department staff profile automatically.</div>
+    <button class="btn" type="button" onclick="window.print()">Print / Save Teacher Login Slip</button>
+    <a class="btn secondary" href="{{ url_for('department_detail', dept=department_key) }}">View Department Staff Page</a>
+    <a class="btn secondary" href="{{ url_for('teacher_register') }}">Register Another Teacher</a>
+    <a class="btn secondary" href="{{ url_for('dashboard') }}">Return to HOD Dashboard</a>
+  </div>
+</section>
+{% endblock %}

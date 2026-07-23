@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+{% block title %}School Calendar - Kafubu Block Secondary School{% endblock %}
+{% block content %}
+<section class="page">
+  <h2>School Calendar</h2>
+  <p>View important school dates, activities, assessments, meetings and events.</p>
+  {% if session.get('role') in CALENDAR_MANAGEMENT_ROLES %}
+    <a class="btn" href="{{ url_for('manage_school_calendar') }}">Add / Manage Calendar Events</a>
+  {% endif %}
+
+  <div class="calendar-list">
+    {% for e in events %}
+      <div class="card calendar-event">
+        <div class="calendar-date">
+          <strong>{{ e.event_date }}</strong>
+          {% if e.start_time or e.end_time %}<span>{{ e.start_time }}{% if e.end_time %} - {{ e.end_time }}{% endif %}</span>{% endif %}
+        </div>
+        <div>
+          <h3>{{ e.title }}</h3>
+          <p><span class="badge">{{ e.category }}</span></p>
+          {% if e.venue %}<p><b>Venue:</b> {{ e.venue }}</p>{% endif %}
+          {% if e.audience %}<p><b>Audience:</b> {{ e.audience }}</p>{% endif %}
+          {% if e.description %}<p>{{ e.description }}</p>{% endif %}
+        </div>
+      </div>
+    {% else %}
+      <div class="card"><p>No calendar events have been added yet.</p></div>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}

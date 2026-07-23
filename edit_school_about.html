@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="page">
+  <h2>Edit About Page Information</h2>
+  <p>Use this page to update the school Vision, Mission, Core Values and Motto shown on the public About page.</p>
+  <form method="post" class="form-card wide">
+    <label>About School Introduction</label>
+    <textarea name="about_intro" rows="5" required>{{ content.about_intro }}</textarea>
+
+    <label>Vision</label>
+    <textarea name="vision" rows="3" required>{{ content.vision }}</textarea>
+
+    <label>Mission</label>
+    <textarea name="mission" rows="3" required>{{ content.mission }}</textarea>
+
+    <label>Core Values</label>
+    <textarea name="core_values" rows="4" required>{{ content.core_values }}</textarea>
+
+    <label>School Motto</label>
+    <input name="motto" value="{{ content.motto }}" required>
+
+    <button class="btn">Save About Page Changes</button>
+    <a class="btn secondary" href="{{ url_for('about') }}">Cancel</a>
+  </form>
+</section>
+{% endblock %}
