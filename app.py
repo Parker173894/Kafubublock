@@ -134,8 +134,12 @@ BACKUP_RETENTION = _env_int('BACKUP_RETENTION', 30, 3, 365)
 
 
 def get_db():
-    conn = sqlite3.connect(DB_PATH)
+    # Render can briefly keep SQLite busy while another request or startup task
+    # finishes a write. Give the connection time to wait instead of immediately
+    # turning that temporary condition into an Internal Server Error.
+    conn = sqlite3.connect(DB_PATH, timeout=15)
     conn.row_factory = sqlite3.Row
+    conn.execute('PRAGMA busy_timeout = 15000')
     return conn
 
 
@@ -716,19 +720,38 @@ app.jinja_env.globals['csrf_token'] = get_csrf_token
 
 def too_many_login_attempts(username):
     cutoff = (datetime.now() - timedelta(minutes=LOGIN_LOCK_MINUTES)).strftime('%Y-%m-%d %H:%M:%S')
-    conn = get_db()
-    row = conn.execute('''SELECT COUNT(*) AS total FROM login_attempts
-                          WHERE username=? AND ip_address=? AND success='No' AND attempted_at>=?''',
-                       (username, get_client_ip(), cutoff)).fetchone()
-    conn.close()
-    return row['total'] >= LOGIN_MAX_ATTEMPTS
+    conn = None
+    try:
+        conn = get_db()
+        row = conn.execute('''SELECT COUNT(*) AS total FROM login_attempts
+                              WHERE username=? AND ip_address=? AND success='No' AND attempted_at>=?''',
+                           (username, get_client_ip(), cutoff)).fetchone()
+        return row['total'] >= LOGIN_MAX_ATTEMPTS
+    except sqlite3.Error:
+        # A temporary audit-table problem must not prevent an authorised user
+        # from reaching the login check.
+        return False
+    finally:
+        if conn is not None:
+            conn.close()
 
 
 def record_login_attempt(username, success):
-    conn = get_db()
-    conn.execute('INSERT INTO login_attempts(username, ip_address, success, attempted_at) VALUES(?,?,?,?)',
-                 (username, get_client_ip(), 'Yes' if success else 'No', datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
-    conn.commit(); conn.close()
+    conn = None
+    try:
+        conn = get_db()
+        conn.execute('INSERT INTO login_attempts(username, ip_address, success, attempted_at) VALUES(?,?,?,?)',
+                     (username, get_client_ip(), 'Yes' if success else 'No',
+                      datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
+        conn.commit()
+    except sqlite3.Error:
+        # Login auditing is important, but it must not crash the login itself
+        # when Render's SQLite storage is briefly locked or unavailable.
+        if conn is not None:
+            conn.rollback()
+    finally:
+        if conn is not None:
+            conn.close()
 
 
 def too_many_result_lookup_attempts():

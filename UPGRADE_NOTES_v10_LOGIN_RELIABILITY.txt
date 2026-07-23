@@ -1,0 +1,26 @@
+KAFUBU BLOCK SECONDARY SCHOOL PORTAL
+VERSION 10 - LOGIN RELIABILITY FIX
+
+Changes in this upgrade:
+
+1. The SQLite connection now waits briefly when Render is completing another
+   database write instead of immediately showing an Internal Server Error.
+
+2. A temporary problem writing the login audit record no longer stops an
+   authorised user from logging in.
+
+3. Login-attempt limits and password verification remain active.
+
+Deployment:
+
+- Upload app.py to the root of the GitHub repository and replace the existing
+  app.py file.
+- Commit the change to the main branch.
+- In Render, use Manual Deploy > Clear build cache & deploy if an automatic
+  deployment does not begin.
+
+Important:
+
+If Render still shows an Internal Server Error after this fix, open Render
+Logs, reproduce the error once, and copy the final traceback line. That line
+will identify any separate database or environment problem.
